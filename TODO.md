@@ -407,7 +407,14 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [ ] The `--probe-*` / `--verify-reader` / `--headless-check` harness ported
       with its exact flag vocabulary, `PROBE-*:` / `VERIFY *:` log prefixes and
       exit codes (§5.12). External tooling greps for those strings
-- [ ] Every probe passes against the real library
+- [x] `--headless-check`, `--verify-reader` on an EPUB **and** a PDF,
+      `--probe-queue` and `--probe-highlight` all pass, and `--probe-queue`
+      reorders identically to the Rust build run side by side
+- [ ] The probes that need Kokoro or Ollama: `--probe-tts`, `--probe-audio`,
+      `--probe-ai`, `--probe-summary`, `--probe-ask`, `--probe-import`
+- [ ] **Run the probes against a scratch `HOME`.** They write to the real
+      library — the queue probe reorders your actual reading queue — and a
+      probe combined with `--open` measures a screen the reader is covering
 - [ ] `bin/test` green; the ported tests cover what the Rust build's 75 covered
 - [ ] Open the real database written by the Rust build and read from it
 - [ ] Side-by-side against `~/Projects/omabook`: grid, sidebar, search, queue

@@ -499,6 +499,15 @@ behaviour, and TODO.md tracks them per subsystem.
 puts `HOME` back in its destructor — is the pattern for tests that need to fake
 a home directory, and the theme loader needs exactly that.
 
+**The probe harness writes to the real library.** `--probe-queue` reorders your
+actual reading queue, `--probe-highlight` stores an annotation, `--probe-import`
+imports for real. They are end-to-end checks against
+`~/.local/share/omabook/omabook.db`, not tests, and they leave their changes
+behind. Point `HOME` at a scratch directory, or copy the database aside first
+and know what you are about to change. Note also that a probe flag combined with
+`--open` is not the probe you meant: the reader loads over the library and the
+probe measures a covered screen.
+
 **WebEngine cannot be tested here.** It does not run under the offscreen
 platform — the view never loads and the run is silent rather than failing.
 Reader verification is manual, on the real Wayland session, and must cover an
