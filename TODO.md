@@ -410,16 +410,26 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [x] `--headless-check`, `--verify-reader` on an EPUB **and** a PDF,
       `--probe-queue` and `--probe-highlight` all pass, and `--probe-queue`
       reorders identically to the Rust build run side by side
-- [ ] The probes that need Kokoro or Ollama: `--probe-tts`, `--probe-audio`,
-      `--probe-ai`, `--probe-summary`, `--probe-ask`, `--probe-import`
+- [x] `--probe-ask` — the whole library-Q&A path: the question embedded, KNN
+      over `book_embeddings`, 20 books ranked back into the grid, and prose
+      from `ollama/llama3.2:3b`
+- [x] `--probe-summary` — the reader's assistant: 1,131 characters pulled off
+      the page through the WebChannel bridge and summarised in the ported
+      prompt's own shape
+- [ ] `--probe-tts` and `--probe-audio` — **blocked**: Kokoro is not running
+      (docker needs a group this shell does not have) and `speech-dispatcher`
+      fails to load, so neither speech path can be exercised here. The app
+      degrades as it should meanwhile — the reader opens and reads fine with no
+      speech at all
+- [ ] `--probe-import` and `--probe-ai`
 - [ ] **Run the probes against a scratch `HOME`.** They write to the real
       library — the queue probe reorders your actual reading queue — and a
       probe combined with `--open` measures a screen the reader is covering
 - [ ] `bin/test` green; the ported tests cover what the Rust build's 75 covered
 - [ ] Open the real database written by the Rust build and read from it
-- [ ] Side-by-side against `~/Projects/omabook`: grid, sidebar, search, queue
-      drag, reader on EPUB and PDF, highlight, note, read page, auto read,
-      summarize, ask (all three scopes), library ask, theme switch
+- [~] Side-by-side against `~/Projects/omabook`: the queue drag, the reader on
+      EPUB and PDF, highlights and library Q&A all match. Still to compare:
+      search, the three ask scopes, read page and auto read, theme switch
 - [ ] `qmllint` against the QML, and a run with no engine warnings
 
 ---
