@@ -10,7 +10,7 @@ TARGET = omabook
 
 QT += core gui qml quick quickcontrols2 quickdialogs2 svg
 QT += sql network concurrent
-QT += webenginequick webchannel multimedia texttospeech
+QT += webenginequick webchannel
 # QZipReader lives in QtCore's private headers; it is how EPUBs are read.
 # This pins the binary to the Qt patch version it was built against (SPEC 7.6).
 QT += core-private

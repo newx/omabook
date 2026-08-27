@@ -4,8 +4,8 @@
 #include "app/assets.h"
 #include "core/db/database.h"
 #include "core/import/covers.h"
-#include "core/import/pdf.h"
 #include "core/repo/bookrepository.h"
+#include "core/repo/settingsrepository.h"
 
 #include <QModelIndex>
 #include <QSqlDatabase>
@@ -13,6 +13,8 @@
 #include <QThread>
 
 namespace {
+
+const QString LIBRARY_FOLDER_KEY = QStringLiteral("library_folder");
 
 // Parse the string QML sends into a filter. Unknown input falls back to All
 // rather than showing nothing, which would look like data loss.
@@ -43,7 +45,10 @@ LibraryFilter parseFilter(const QString &text) {
 
 } // namespace
 
-LibraryModel::LibraryModel(QObject *parent) : QAbstractListModel(parent) { }
+LibraryModel::LibraryModel(QObject *parent) : QAbstractListModel(parent) {
+    SettingsRepository settings(Database::forCurrentThread().connection());
+    m_libraryFolder = settings.getOr(LIBRARY_FOLDER_KEY, QString());
+}
 
 LibraryModel::~LibraryModel() {
     // Only reached if the app closes mid-import: the worker thread outlives
@@ -87,6 +92,10 @@ QVariant LibraryModel::data(const QModelIndex &index, int role) const {
         return book.isFavorite;
     case IsQueuedRole:
         return m_queued.contains(book.id);
+    case TextQualityRole:
+        // Same strings as textQualityFor: "good", "poor", "none", or "" when
+        // unknown -- a lookup on the row already in memory, not a query.
+        return book.textQuality.has_value() ? toString(*book.textQuality) : QString();
     default:
         return QVariant();
     }
@@ -103,6 +112,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
         { CoverUrlRole, QByteArrayLiteral("coverUrl") },
         { IsFavoriteRole, QByteArrayLiteral("isFavorite") },
         { IsQueuedRole, QByteArrayLiteral("isQueued") },
+        { TextQualityRole, QByteArrayLiteral("textQuality") },
     };
 }
 
@@ -113,16 +123,7 @@ void LibraryModel::reload() {
     QList<Book> books;
     QString strategy;
 
-    if (!m_ranked.isEmpty()) {
-        const Result<QList<Book>> loaded = repo.listIds(m_ranked);
-        if (loaded.isErr()) {
-            qWarning("could not list ranked books: %s", qUtf8Printable(loaded.error().message));
-            setStatusLine(QStringLiteral("could not list books: %1").arg(loaded.error().message));
-            return;
-        }
-        books = loaded.value();
-        strategy = QStringLiteral("ranked");
-    } else if (!m_search.trimmed().isEmpty()) {
+    if (!m_search.trimmed().isEmpty()) {
         // A search looks across the whole library; narrowing it by the
         // sidebar selection as well would mostly produce empty results.
         const Result<SearchResult> found = repo.search(m_search, BookSort::Title);
@@ -174,32 +175,15 @@ void LibraryModel::reload() {
 }
 
 void LibraryModel::setFilterAndReload(const QString &filter) {
-    // Picking a sidebar entry clears a search or a ranked answer, otherwise
-    // the click would appear to do nothing.
+    // Picking a sidebar entry clears a search, otherwise the click would
+    // appear to do nothing.
     setSearch(QString());
-    m_ranked.clear();
     setFilter(filter);
     reload();
 }
 
 void LibraryModel::setSearchAndReload(const QString &query) {
-    m_ranked.clear();
     setSearch(query);
-    reload();
-}
-
-void LibraryModel::showRankedBooks(const QString &ids) {
-    QList<qint64> parsed;
-    const QStringList parts = ids.split(QLatin1Char(','));
-    for (const QString &part : parts) {
-        bool ok = false;
-        const qint64 id = part.trimmed().toLongLong(&ok);
-        if (ok)
-            parsed.append(id);
-    }
-
-    setSearch(QString());
-    m_ranked = parsed;
     reload();
 }
 
@@ -227,8 +211,6 @@ void LibraryModel::deleteBook(qint64 bookId) {
     if (removed.isErr())
         qWarning("could not delete book %lld: %s", bookId, qUtf8Printable(removed.error().message));
 
-    // A ranked answer still listing the deleted book would be stale.
-    m_ranked.removeAll(bookId);
     reload();
 }
 
@@ -237,7 +219,7 @@ void LibraryModel::moveQueued(int from, int to) {
     // other listing is ordered by the database, so a move there would be
     // undone by the next reload.
     const bool showingQueue = parseFilter(m_filter).kind == LibraryFilter::Kind::Queue
-        && m_ranked.isEmpty() && m_search.trimmed().isEmpty();
+        && m_search.trimmed().isEmpty();
     if (!showingQueue)
         return;
 
@@ -306,22 +288,6 @@ QString LibraryModel::textQualityFor(qint64 bookId) const {
     return toString(*quality);
 }
 
-QString LibraryModel::pdfPageText(qint64 bookId, int page) const {
-    if (page < 1)
-        return QString();
-
-    QSqlDatabase &db = Database::forCurrentThread().connection();
-    const Result<std::optional<Book>> found = BookRepository(db).find(bookId);
-    if (found.isErr() || !found.value().has_value())
-        return QString();
-
-    const Book &book = *found.value();
-    if (book.format != BookFormat::Pdf)
-        return QString();
-
-    return Pdf::extractText(book.readablePath(), page, page).value_or(QString());
-}
-
 QString LibraryModel::readerUrlFor(qint64 bookId) const {
     QSqlDatabase &db = Database::forCurrentThread().connection();
     BookRepository repo(db);
@@ -340,6 +306,9 @@ void LibraryModel::importDirectory(const QString &path) {
     if (m_busy)
         return;
 
+    // A folder just imported is the one imported again by default.
+    setLibraryFolder(path);
+
     setBusy(true);
     setStatusLine(QStringLiteral("scanning…"));
 
@@ -356,6 +325,28 @@ void LibraryModel::importDirectory(const QString &path) {
 
     m_importThread = thread;
     thread->start();
+}
+
+void LibraryModel::importDirectory() {
+    if (m_libraryFolder.isEmpty()) {
+        setStatusLine(QStringLiteral("No import folder is remembered yet."));
+        return;
+    }
+    importDirectory(m_libraryFolder);
+}
+
+void LibraryModel::setLibraryFolder(const QString &path) {
+    if (m_libraryFolder == path)
+        return;
+
+    m_libraryFolder = path;
+
+    QSqlDatabase &db = Database::forCurrentThread().connection();
+    const Result<void> saved = SettingsRepository(db).set(LIBRARY_FOLDER_KEY, path);
+    if (saved.isErr())
+        qWarning("could not persist library_folder: %s", qUtf8Printable(saved.error().message));
+
+    emit libraryFolderChanged();
 }
 
 void LibraryModel::onImportProgress(const QString &text) {

@@ -17,19 +17,10 @@ ApplicationWindow {
     SidebarModel { id: sidebarData }
     ThemeModel { id: themeModel }
     NotesModel { id: notesModel }
-    AiController { id: libraryAi }
-
-    Connections {
-        target: libraryAi
-        function onLibraryAnswered(ids) {
-            if (ids !== "") library.showRankedBooks(ids)
-        }
-    }
 
     // Which view the content area shows. Some sidebar rows are destinations
     // rather than library filters, so they are tracked separately.
     property bool showingNotes: sidebarView.current === "notes"
-    property bool showingAsk: sidebarView.current === "ask"
     property bool showingSettings: sidebarView.current === "settings"
     /// The queue is the one list ordered by hand, so it alone can be dragged.
     property bool showingQueue: sidebarView.current === "queue" && library.search === ""
@@ -83,7 +74,6 @@ ApplicationWindow {
         }
 
         if (Qt.application.arguments.indexOf("--probe-queue") !== -1) queueProbe.start()
-        if (window.probingAsk) askProbe.start()
 
         if (Qt.application.arguments.indexOf("--headless-check") !== -1) {
             console.log("SLICE count:", library.count,
@@ -93,43 +83,6 @@ ApplicationWindow {
                         "| tags:", sidebarData.tags_json)
             Qt.callLater(Qt.quit)
         }
-    }
-
-    // Ask probe: put a real question to the library through the page's own
-    // input, and report what comes back. The answer is left on screen for a
-    // moment before quitting, so the page can be looked at as well as read.
-    property bool probingAsk: Qt.application.arguments.indexOf("--probe-ask") !== -1
-
-    Timer {
-        id: askProbe
-        interval: 1200
-        running: false
-        onTriggered: {
-            sidebarView.pick("ask")
-            var idx = Qt.application.arguments.indexOf("--probe-ask")
-            askView.ask(Qt.application.arguments[idx + 1]
-                        || "which books do I have about mathematics?")
-        }
-    }
-
-    Connections {
-        target: libraryAi
-        enabled: window.probingAsk
-        function onBusyChanged() {
-            if (libraryAi.busy) return
-            console.log("PROBE-ASK provider:", libraryAi.provider)
-            console.log("PROBE-ASK status:", libraryAi.status || "(ok)")
-            console.log("PROBE-ASK answer:",
-                        libraryAi.answer.substring(0, 200).replace(/\s+/g, " "))
-            console.log("PROBE-ASK ranked books:", library.count)
-            askProbeLinger.start()
-        }
-    }
-
-    Timer {
-        id: askProbeLinger
-        interval: 4000
-        onTriggered: Qt.exit(0)
     }
 
     // Queue probe: switch to the reading queue and drag a card through the
@@ -315,11 +268,8 @@ ApplicationWindow {
                 if (filter === "notes") {
                     notesModel.book_id = 0
                     notesModel.reload()
-                } else if (filter === "ask") {
-                    // Re-probe: Ollama may have been started since launch.
-                    libraryAi.refresh()
                 } else if (filter === "settings") {
-                    // The page probes for itself when it loads.
+                    // Nothing to prime; the page reads library state directly.
                 } else {
                     library.setFilterAndReload(filter)
                 }
@@ -339,13 +289,6 @@ ApplicationWindow {
                 anchors.fill: parent
                 spacing: 0
                 visible: !window.showingNotes && !window.showingSettings
-
-                AskView {
-                    id: askView
-                    Layout.fillWidth: true
-                    visible: window.showingAsk
-                    ai: libraryAi
-                }
 
                 QueueHelp {
                     Layout.fillWidth: true
@@ -427,6 +370,7 @@ ApplicationWindow {
                                 favorite: cell.model.isFavorite
                                 queued: cell.model.isQueued
                                 queuePosition: window.showingQueue ? cell.index + 1 : 0
+                                textQuality: cell.model.textQuality
 
                                 readonly property bool held:
                                     dragHandler.active || window.probeDragBookId === cell.model.bookId
@@ -516,20 +460,15 @@ ApplicationWindow {
                 onOpenBook: (bookId, cfi) => readerLoader.open(bookId)
             }
 
-            // Built when first opened, and torn down when left: the page
-            // constructs a speech controller, which probes a service over HTTP.
+            // Built when first opened, and torn down when left, like the
+            // reader loader below.
             Loader {
                 anchors.fill: parent
                 active: window.showingSettings
                 visible: active
-                sourceComponent: settingsPage
+                source: "SettingsView.qml"
+                onLoaded: item.library = library
             }
-
-            Component {
-                id: settingsPage
-                SettingsView { ai: libraryAi }
-            }
-
         }
     }
 

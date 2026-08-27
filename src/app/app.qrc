@@ -1,8 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <file alias="AiPanel.qml">qml/AiPanel.qml</file>
-        <file alias="AnswerBox.qml">qml/AnswerBox.qml</file>
-        <file alias="AskView.qml">qml/AskView.qml</file>
         <file alias="BookCard.qml">qml/BookCard.qml</file>
         <file alias="BrandMark.qml">qml/BrandMark.qml</file>
         <file alias="ConfirmDialog.qml">qml/ConfirmDialog.qml</file>

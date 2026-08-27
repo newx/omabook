@@ -66,7 +66,6 @@ Rectangle {
                     { id: "queue",     name: "Reading queue", icon: Icons.bookmark, count: sidebar.model ? sidebar.model.count_queue : 0 },
                     { id: "completed", name: "Completed",     icon: Icons.check,    count: sidebar.model ? sidebar.model.count_completed : 0 },
                     { id: "notes",     name: "Highlights & notes", icon: Icons.pencil, count: sidebar.noteCount },
-                    { id: "ask",       name: "Ask",           icon: Icons.bubble },
                     { id: "settings",  name: "Settings",      icon: Icons.sliders }
                 ]
                 current: sidebar.current

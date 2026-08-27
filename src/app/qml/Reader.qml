@@ -3,8 +3,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtWebChannel
 import QtWebEngine
-import QtMultimedia
-import QtTextToSpeech
 import com.omabook.app
 
 // The reader: QML chrome around a WebEngineView running foliate-js.
@@ -18,51 +16,8 @@ Item {
     property int bookId: -1
     property string filePath: ""
 
-    Component.onDestruction: tts.stop()
-
-    // "good" | "poor" | "none" | "". Reading aloud is hidden when there is no
-    // text to read, and flagged when the text is noisy (SPEC §7.2).
-    property string textQuality: ""
-    readonly property bool canReadAloud: textQuality !== "none"
-
-    // Whether anything can actually speak. Kokoro brings its own audio, but the
-    // "system" engine is Qt's, and on a desktop with neither speech-dispatcher
-    // nor flite installed the plugin behind it fails to load: the engine sits
-    // in Error with no voices, say() is silent, and the Ready that advances the
-    // chunk loop never arrives. Offering the buttons then buys a session that
-    // claims to be reading, plays nothing, and never ends.
-    readonly property bool canSpeak: tts.engine !== "system" || systemVoice.usable
-
-    // Why the read-aloud buttons are dead, in the terms of the thing the reader
-    // would have to install. Both routes are real: Kokoro is the good one.
-    readonly property string noVoiceHint:
-        "No voice available. Start Kokoro (docker compose up -d kokoro), " +
-        "or install speech-dispatcher for a system voice."
-
     function load() {
-        textQuality = library ? library.textQualityFor(reader.bookId) : ""
         view.url = library ? library.readerUrlFor(reader.bookId) : ""
-    }
-
-    // The text of what is on screen. EPUBs supply it from the page's visible
-    // range; PDFs have none to give, so it comes from pdftotext instead.
-    function currentPageText() {
-        var text = bridgeObject.pageText()
-        if (text && text.length > 0) return text
-        if (reader.library && bridgeObject.pdf_page > 0)
-            return reader.library.pdfPageText(reader.bookId, bridgeObject.pdf_page)
-        return ""
-    }
-
-    // Ask the page what is on screen *now*, then hand it to `callback`.
-    // Reading aloud must always start at the top of the page in front of the
-    // reader, so it takes the text at the moment of the click rather than the
-    // copy cached at the last relocate, which can be a page behind.
-    function fetchPageText(callback) {
-        view.runJavaScript("window.omabookPageText()", function(text) {
-            if (text && text.length > 0) callback(text)
-            else callback(reader.currentPageText())
-        })
     }
 
     // Paint saved highlights once the page says it is ready to be called into.
@@ -117,199 +72,6 @@ Item {
         }
     }
 
-    // Rust owns the reading loop; these two only play what it hands over.
-    TtsController {
-        id: tts
-
-        onPlayAudio: (path) => {
-            player.stop()
-            player.source = "file://" + path
-            player.play()
-        }
-
-        onSpeakSystem: (text) => {
-            // Kokoro can hand the session back to the system engine mid-book
-            // when synthesis fails, so this is reachable even though the
-            // buttons are gated on canSpeak.
-            if (!systemVoice.usable) {
-                tts.chunkFailed("no system voice is installed")
-                return
-            }
-            systemVoice.stop()
-            systemVoice.say(text)
-        }
-
-        onPauseRequested: (paused) => {
-            if (paused) { player.pause(); systemVoice.pause() }
-            else { player.play(); systemVoice.resume() }
-        }
-
-        onStopPlayback: {
-            player.stop()
-            systemVoice.stop()
-        }
-
-        onNeedNextPage: {
-            // Turn the page in the reader, then feed the new text back.
-            view.runJavaScript("window.omabookAdvance()", function(text) {
-                // A PDF returns nothing here; give pdftotext a moment to see
-                // the new page number, then read that instead.
-                if (text && text.length > 0) tts.continueWithPage(text)
-                else pdfPageSettle.start()
-            })
-        }
-    }
-
-    // Audio probe: use the real MediaPlayer and report whether it reaches
-    // PlayingState with a moving position. Proves the output path, not just
-    // that files were synthesized.
-    property bool probingAudio: Qt.application.arguments.indexOf("--probe-audio") !== -1
-
-    // AI probe: ask the open book a question through the real controller and
-    // report what comes back.
-    property bool probingAi: Qt.application.arguments.indexOf("--probe-ai") !== -1
-
-    // Summarize probe: drive the panel's own action, so the binding the user
-    // clicks is the one under test.
-    property bool probingSummary: Qt.application.arguments.indexOf("--probe-summary") !== -1
-
-    Timer {
-        id: summaryProbeStart
-        interval: 1500
-        running: false
-        onTriggered: {
-            reader.aiOpen = true
-            Qt.callLater(function() {
-                var panel = aiPanel.item
-                console.log("PROBE-SUM panel:", panel ? "loaded" : "NULL",
-                            "| panel.ai:", (panel && panel.ai) ? "bound" : "NULL",
-                            "| ready:", panel ? panel.ready : "n/a",
-                            "| pageChars:", panel ? panel.pageText.length : 0)
-                if (panel && panel.ready)
-                    panel.ai.summarizePage(panel.pageText, panel.bookTitle, panel.chapter)
-                else
-                    Qt.exit(1)
-            })
-        }
-    }
-
-    Connections {
-        target: aiController
-        enabled: reader.probingSummary
-        function onBusyChanged() {
-            if (aiController.busy) return
-            console.log("PROBE-SUM status:", aiController.status || "(ok)")
-            console.log("PROBE-SUM provider:", aiController.provider)
-            console.log("PROBE-SUM summary:", aiController.answer.substring(0, 300).replace(/\s+/g, " "))
-            summaryProbeLinger.start()
-        }
-    }
-
-    Timer {
-        id: summaryProbeLinger
-        // As --probe-ask does: hold the panel open for a moment once the
-        // summary lands, so it can be looked at as well as read.
-        interval: 4000
-        onTriggered: Qt.exit(0)
-    }
-
-    Timer {
-        id: aiProbeStart
-        interval: 1500
-        running: false
-        onTriggered: {
-            console.log("PROBE-AI providers:", aiController.available_providers,
-                        "| onMains:", aiController.on_mains,
-                        "| indexState:", aiController.indexState(reader.bookId))
-            var idx = Qt.application.arguments.indexOf("--probe-ai")
-            var q = Qt.application.arguments[idx + 1] || "What does Ishmael do when he feels grim?"
-            aiController.askBook(reader.bookId, q, "book", reader.currentPageText(), -1)
-        }
-    }
-
-    Connections {
-        target: aiController
-        enabled: reader.probingAi
-        function onBusyChanged() {
-            if (aiController.busy) return
-            console.log("PROBE-AI status:", aiController.status || "(ok)")
-            console.log("PROBE-AI provider:", aiController.provider)
-            console.log("PROBE-AI answer:", aiController.answer.substring(0, 240).replace(/\s+/g, " "))
-            console.log("PROBE-AI sourceCount:", aiController.sources === "" ? 0 : aiController.sources.split("\n\n").length)
-            Qt.exit(0)
-        }
-    }
-
-    Timer {
-        id: audioProbeStart
-        interval: 1500
-        running: false
-        onTriggered: {
-            console.log("PROBE-AUDIO engine:", tts.engine)
-            reader.fetchPageText(function(text) {
-                tts.startReading(text, false)
-                audioProbeCheck.start()
-            })
-        }
-    }
-
-    Timer {
-        id: audioProbeCheck
-        interval: 6000
-        onTriggered: {
-            console.log("PROBE-AUDIO playbackState:", player.playbackState,
-                        "(1=Playing)",
-                        "| position:", player.position, "ms",
-                        "| duration:", player.duration, "ms",
-                        "| error:", player.errorString || "none",
-                        "| source:", String(player.source).slice(-24))
-            // Prove pause works on the real player too.
-            tts.togglePause()
-            Qt.callLater(function() {
-                console.log("PROBE-AUDIO after pause:", player.playbackState, "(2=Paused)",
-                            "| tts.paused:", tts.paused)
-                // ...and that Stop silences it at once, rather than at the end
-                // of the chunk already handed over.
-                tts.stop()
-                Qt.callLater(function() {
-                    console.log("PROBE-AUDIO after stop:", player.playbackState,
-                                "(0=Stopped)", "| tts.speaking:", tts.speaking)
-                    Qt.exit(0)
-                })
-            })
-        }
-    }
-
-    Timer {
-        id: pdfPageSettle
-        interval: 250
-        onTriggered: tts.continueWithPage(reader.currentPageText())
-    }
-
-    MediaPlayer {
-        id: player
-        audioOutput: AudioOutput {}
-        onMediaStatusChanged: {
-            if (mediaStatus === MediaPlayer.EndOfMedia) tts.chunkFinished()
-        }
-        onErrorOccurred: (error, str) => tts.chunkFailed(str)
-    }
-
-    TextToSpeech {
-        id: systemVoice
-
-        // Read once: engines are installed, not started, so this cannot change
-        // while the app runs. availableVoices() is a call rather than a
-        // property, so a binding would not re-evaluate anyway.
-        property bool usable: false
-        Component.onCompleted: systemVoice.usable = availableVoices().length > 0
-
-        onStateChanged: {
-            // Ready after speaking means the utterance finished.
-            if (state === TextToSpeech.Ready && tts.speaking) tts.chunkFinished()
-        }
-    }
-
     ReaderBridge {
         id: bridgeObject
         WebChannel.id: "reader"
@@ -335,10 +97,6 @@ Item {
             if (connected) reader.paintAnnotations()
             if (connected) reader.applyAppearance()
             if (reader.probingHighlight && connected) highlightProbe.start()
-            if (reader.probingTts && connected) ttsProbeStart.start()
-            if (reader.probingAudio && connected) audioProbeStart.start()
-            if (reader.probingAi && connected) aiProbeStart.start()
-            if (reader.probingSummary && connected) summaryProbeStart.start()
             if (!reader.verifying || !connected) return
             verifyTimeout.stop()
             // Give the first relocate a moment to land.
@@ -350,41 +108,6 @@ Item {
                 console.log("VERIFY result: FAILED —", error)
                 Qt.exit(1)
             }
-        }
-    }
-
-    // TTS probe: start reading and report what the Rust loop actually emits,
-    // which is verifiable even with no speech engine installed.
-    property bool probingTts: Qt.application.arguments.indexOf("--probe-tts") !== -1
-    property int audioEmissions: 0
-    property int systemEmissions: 0
-
-    Connections {
-        target: tts
-        enabled: reader.probingTts && !reader.probingAudio
-        function onPlayAudio(path) {
-            reader.audioEmissions++
-            console.log("PROBE-TTS audio", reader.audioEmissions, "->", path)
-            // Stand in for playback finishing, so the loop advances without
-            // waiting out the real audio.
-            Qt.callLater(function() { tts.chunkFinished() })
-        }
-        function onSpeakSystem(text) {
-            reader.systemEmissions++
-            console.log("PROBE-TTS chunk", reader.systemEmissions,
-                        "chars=" + text.length,
-                        "|", text.substring(0, 64).replace(/\s+/g, " "))
-            // Stand in for the speech engine: report the chunk as finished so
-            // the loop advances exactly as it would with real audio.
-            Qt.callLater(function() { tts.chunkFinished() })
-        }
-        function onNeedNextPage() { console.log("PROBE-TTS page exhausted -> advancing") }
-        function onFinished(reason) {
-            console.log("PROBE-TTS finished:", reason,
-                        "| audio:", reader.audioEmissions,
-                        "| system:", reader.systemEmissions,
-                        "| engine:", tts.engine)
-            Qt.exit(0)
         }
     }
 
@@ -450,21 +173,6 @@ Item {
     }
 
     Timer {
-        id: ttsProbeStart
-        interval: 1200
-        running: false
-        onTriggered: {
-            reader.fetchPageText(function(text) {
-                console.log("PROBE-TTS engine:", tts.engine,
-                            "| pageChars:", text.length,
-                            "| page:", bridgeObject.pdf_page,
-                            "|", text.substring(0, 64).replace(/\s+/g, " "))
-                tts.startReading(text, false)
-            })
-        }
-    }
-
-    Timer {
         id: verifyReport
         interval: 2500
         onTriggered: {
@@ -490,16 +198,8 @@ Item {
         }
     }
 
-    AiController { id: aiController }
-    property bool aiOpen: false
-
-    RowLayout {
-        anchors.fill: parent
-        spacing: 0
-
     ColumnLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
+        anchors.fill: parent
         spacing: 0
 
         WebEngineView {
@@ -559,66 +259,8 @@ Item {
                     onClicked: view.runJavaScript("window.omabookNext()")
                 }
 
-                FlatButton {
-                    visible: reader.canReadAloud
-                    enabled: reader.canSpeak
-                    text: tts.speaking && !tts.continuous ? "■ Stop" : "▶ Read page"
-                    tooltip: !reader.canSpeak
-                        ? reader.noVoiceHint
-                        : reader.textQuality === "poor"
-                        ? "Read this page aloud. This book's text extracted poorly, so it may sound wrong."
-                        : "Read this page aloud, then stop"
-                    onClicked: {
-                        if (tts.speaking) tts.stop()
-                        else reader.fetchPageText(function(text) {
-                            tts.startReading(text, false)
-                        })
-                    }
-                }
-
-                FlatButton {
-                    visible: tts.speaking
-                    text: tts.paused ? "▶ Resume" : "❚❚ Pause"
-                    tooltip: "Pause or resume reading"
-                    onClicked: tts.togglePause()
-                }
-
-                FlatButton {
-                    visible: tts.speaking
-                    text: tts.speed.toFixed(2).replace(/0$/, "") + "×"
-                    tooltip: "Reading speed"
-                    onClicked: {
-                        // Cycle through the speeds people actually use.
-                        var steps = [1.0, 1.25, 1.5, 1.75, 0.75]
-                        var next = steps[(steps.indexOf(tts.speed) + 1) % steps.length]
-                        tts.changeSpeed(next === undefined ? 1.0 : next)
-                    }
-                }
-
-                FlatButton {
-                    visible: reader.canReadAloud
-                    enabled: reader.canSpeak
-                    text: tts.speaking && tts.continuous ? "■ Stop" : "▶▶ Auto read"
-                    tooltip: reader.canSpeak ? "Read aloud and keep turning pages"
-                                             : reader.noVoiceHint
-                    onClicked: {
-                        if (tts.speaking) tts.stop()
-                        else reader.fetchPageText(function(text) {
-                            tts.startReading(text, true)
-                        })
-                    }
-                }
-
                 Label {
-                    // A visible warning beats a button that reads nonsense.
-                    visible: reader.textQuality === "poor" && !tts.speaking
-                    text: "⚠ text extracted poorly"
-                    color: Theme.muted
-                    font.pixelSize: 11
-                }
-
-                Label {
-                    text: tts.status !== "" ? tts.status : bridgeObject.chapter
+                    text: bridgeObject.chapter
                     color: Theme.muted
                     elide: Text.ElideRight
                     Layout.fillWidth: true
@@ -665,38 +307,6 @@ Item {
                     Layout.preferredWidth: 38
                     horizontalAlignment: Text.AlignRight
                 }
-
-                FlatButton {
-                    text: "Assistant"
-                    // Dead when nothing can answer. The panel says the same
-                    // thing inside, but a button that opens onto "no provider"
-                    // reads as broken; a dimmed one reads as not set up.
-                    enabled: aiController.available_providers !== "none"
-                    tooltip: enabled ? "Summaries and questions about this book"
-                                     : "No AI provider is reachable. Start Ollama, or set a key in Settings."
-                    onClicked: {
-                        reader.aiOpen = !reader.aiOpen
-                        if (reader.aiOpen) aiPanel.item.refreshIndexState()
-                    }
-                }
-            }
-        }
-    }
-
-        Loader {
-            id: aiPanel
-            active: reader.aiOpen
-            visible: active
-            Layout.preferredWidth: 340
-            Layout.fillHeight: true
-            sourceComponent: AiPanel {
-                ai: aiController
-                bookId: reader.bookId
-                pageText: reader.currentPageText()
-                bookTitle: reader.library ? reader.library.titleFor(reader.bookId) : ""
-                chapter: bridgeObject.chapter
-                ordinal: -1
-                onCloseRequested: reader.aiOpen = false
             }
         }
     }

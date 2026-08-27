@@ -20,9 +20,7 @@ HEADERS += \
     $$PWD/test_core.h \
     $$PWD/test_repo.h \
     $$PWD/test_import.h \
-    $$PWD/test_parsers.h \
-    $$PWD/test_ai.h \
-    $$PWD/test_tts.h
+    $$PWD/test_parsers.h
 
 SOURCES += $$PWD/tst_omabook.cpp
 

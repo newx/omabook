@@ -16,5 +16,3 @@ SOURCES += \
 include($$PWD/bridge/library.pri)
 include($$PWD/bridge/notes.pri)
 include($$PWD/bridge/reader.pri)
-include($$PWD/bridge/speech.pri)
-include($$PWD/bridge/assistant.pri)

@@ -7,17 +7,13 @@
 
 HEADERS += \
     $$PWD/result.h \
-    $$PWD/omarchy.h \
-    $$PWD/services.h
+    $$PWD/omarchy.h
 
 SOURCES += \
-    $$PWD/omarchy.cpp \
-    $$PWD/services.cpp
+    $$PWD/omarchy.cpp
 
 include($$PWD/db/db.pri)
 include($$PWD/models/models.pri)
 include($$PWD/repo/repo.pri)
 include($$PWD/import/import.pri)
 include($$PWD/import/parsers.pri)
-include($$PWD/ai/ai.pri)
-include($$PWD/tts/tts.pri)

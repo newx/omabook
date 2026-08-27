@@ -21,11 +21,4 @@ QString readerDir();
 // A file:// URL for the reader, with the book and start position attached.
 // Empty when readerDir() found nothing.
 QString readerUrl(const QString &bookPath, const QString &cfi);
-
-// Where compose.yml lives, when this build has a checkout beside it.
-//
-// A packaged install has none, and that is fine: an existing container starts
-// by name, and only creating one for the first time needs the file.
-QString composeDir();
-
 } // namespace Assets

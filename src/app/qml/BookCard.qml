@@ -18,6 +18,9 @@ Item {
     /// Place in the reading queue, counting from 1. Zero hides the badge —
     /// only the queue itself has an order worth showing.
     property int queuePosition: 0
+    /// "good" | "poor" | "none" | "". Only the two bad cases are worth a
+    /// badge; a book that reads fine has nothing to say about it (SPEC §7.2).
+    property string textQuality: ""
 
     signal opened()
     signal favoriteToggled()
@@ -135,6 +138,35 @@ Item {
                         font.pixelSize: 11
                         font.bold: true
                     }
+                }
+
+                // Text quality, floating over the cover's top right. Same
+                // translucent-black treatment as the queue badge, opposite
+                // corner so the two never overlap.
+                Rectangle {
+                    visible: card.textQuality === "poor" || card.textQuality === "none"
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    width: 20
+                    height: 20
+                    radius: height / 2
+                    color: Qt.rgba(0, 0, 0, 0.62)
+
+                    HoverHandler { id: qualityHover }
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: "⚠"
+                        color: "#ffffff"
+                        font.pixelSize: 11
+                    }
+
+                    ToolTip.visible: qualityHover.hovered
+                    ToolTip.text: card.textQuality === "none"
+                        ? "No extractable text — this looks like a scanned PDF"
+                        : "This book's text extracted poorly"
+                    ToolTip.delay: 500
                 }
 
                 // A hairline under the cover, separating it from the metadata.

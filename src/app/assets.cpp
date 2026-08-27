@@ -76,14 +76,4 @@ QString readerUrl(const QString &bookPath, const QString &cfi) {
 
     return url;
 }
-
-QString composeDir() {
-    const QString overridden = qEnvironmentVariable("OMABOOK_COMPOSE_DIR");
-    if (!overridden.isEmpty()
-            && QFileInfo::exists(overridden + QStringLiteral("/compose.yml")))
-        return overridden;
-
-    return ancestorHolding(QStringLiteral("compose.yml"));
-}
-
 } // namespace Assets

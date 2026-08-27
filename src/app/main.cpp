@@ -6,13 +6,11 @@
 #include <QQmlContext>
 #include <QtWebEngineQuick>
 
-#include "bridge/aicontroller.h"
 #include "bridge/librarymodel.h"
 #include "bridge/notesmodel.h"
 #include "bridge/readerbridge.h"
 #include "bridge/sidebarmodel.h"
 #include "bridge/thememodel.h"
-#include "bridge/ttscontroller.h"
 
 // The QML module the .qml files import. Kept from the Rust build so the
 // existing `import com.omabook.app` lines still resolve.
@@ -34,16 +32,14 @@ int main(int argc, char *argv[]) {
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     // The QML declares its own backend instances (`ThemeModel { id: themeModel }`),
-    // as the Rust build's module did. That is what lets AiController and
-    // TtsController exist more than once with independent state (SPEC 5.13),
-    // which a context property could not do.
+    // as the Rust build's module did. That is what lets each of these exist
+    // more than once with independent state (SPEC 5.13), which a context
+    // property could not do.
     qmlRegisterType<ThemeModel>(QML_URI, 1, 0, "ThemeModel");
     qmlRegisterType<LibraryModel>(QML_URI, 1, 0, "LibraryModel");
-    qmlRegisterType<AiController>(QML_URI, 1, 0, "AiController");
     qmlRegisterType<SidebarModel>(QML_URI, 1, 0, "SidebarModel");
     qmlRegisterType<NotesModel>(QML_URI, 1, 0, "NotesModel");
     qmlRegisterType<ReaderBridge>(QML_URI, 1, 0, "ReaderBridge");
-    qmlRegisterType<TtsController>(QML_URI, 1, 0, "TtsController");
 
     // A pragma Singleton is not resolved by the implicit directory import the
     // way an ordinary sibling component is; without this it reads as

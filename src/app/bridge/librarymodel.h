@@ -32,6 +32,9 @@ class LibraryModel : public QAbstractListModel {
     Q_PROPERTY(QString search READ search NOTIFY searchChanged)
     Q_PROPERTY(QString search_strategy READ searchStrategy NOTIFY searchStrategyChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+    // Snake case, because the QML reads library_folder -- see CLAUDE.md,
+    // "QML conventions".
+    Q_PROPERTY(QString library_folder READ libraryFolder NOTIFY libraryFolderChanged)
 
 public:
     // Roles from Qt::UserRole (256), in this fixed order -- the Rust
@@ -47,6 +50,7 @@ public:
         CoverUrlRole,
         IsFavoriteRole,
         IsQueuedRole,
+        TextQualityRole,
     };
 
     explicit LibraryModel(QObject *parent = nullptr);
@@ -58,35 +62,29 @@ public:
     QString search() const { return m_search; }
     QString searchStrategy() const { return m_searchStrategy; }
     bool busy() const { return m_busy; }
+    QString libraryFolder() const { return m_libraryFolder; }
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    // Re-read the current filter's (or search's, or ranked list's) books
-    // from the database and reset the model.
+    // Re-read the current filter's (or search's) books from the database
+    // and reset the model.
     Q_INVOKABLE void reload();
 
     // Change which slice of the library is shown, then reload. Accepts
     // "all", "favorites", "reading", "queue", "completed", "category:<id>"
-    // or "tag:<id>". Clears any active search or ranked answer, otherwise
-    // the click would appear to do nothing.
+    // or "tag:<id>". Clears any active search, otherwise the click would
+    // appear to do nothing.
     Q_INVOKABLE void setFilterAndReload(const QString &filter);
 
     // Search the library. An empty query returns to the current filter.
     Q_INVOKABLE void setSearchAndReload(const QString &query);
 
-    // Show exactly these books, in exactly this order -- the result of a
-    // library question, where the ranking is the answer. Drives
-    // AiController::libraryAnswered.
-    Q_INVOKABLE void showRankedBooks(const QString &ids);
-
     Q_INVOKABLE void toggleFavorite(qint64 bookId);
     Q_INVOKABLE void toggleQueued(qint64 bookId);
 
-    // Remove a book from the library. The file on disk is untouched. Also
-    // drops the id from any active ranked list, which would otherwise go on
-    // showing a book that no longer exists.
+    // Remove a book from the library. The file on disk is untouched.
     Q_INVOKABLE void deleteBook(qint64 bookId);
 
     // Move a queued book from one place in the grid to another, and
@@ -95,6 +93,11 @@ public:
     // database-ordered and a drag there would be silently undone on the
     // next reload.
     Q_INVOKABLE void moveQueued(int from, int to);
+
+    // Remember the folder for future imports and persist it. Called from
+    // Settings; also called internally so a folder just imported is the one
+    // imported again by default.
+    Q_INVOKABLE void setLibraryFolder(const QString &path);
 
     // Persist reader position. Called from the reader bridge.
     Q_INVOKABLE void saveProgress(qint64 bookId, const QString &position, double fraction);
@@ -107,18 +110,18 @@ public:
     // unknown. Gates the reading-aloud controls (SPEC §7.2).
     Q_INVOKABLE QString textQualityFor(qint64 bookId) const;
 
-    // Text of one page of a PDF, via pdftotext. Fixed-layout PDFs render to
-    // canvas and expose no text to the page, so the reader cannot supply
-    // it; this is how TTS gets text for half the library.
-    Q_INVOKABLE QString pdfPageText(qint64 bookId, int page) const;
-
     // The reader page URL for a book, resuming where reading stopped.
     Q_INVOKABLE QString readerUrlFor(qint64 bookId) const;
 
     // Import every book under `path`, on a worker thread. The window stays
     // responsive; busy and status_line report progress. A no-op while
-    // already busy.
+    // already busy. Remembers `path` as library_folder, so the no-argument
+    // overload below re-imports the same place.
     Q_INVOKABLE void importDirectory(const QString &path);
+
+    // Import the remembered library_folder. Sets status_line and does
+    // nothing else when no folder has been remembered yet.
+    Q_INVOKABLE void importDirectory();
 
 signals:
     void countChanged();
@@ -127,6 +130,7 @@ signals:
     void searchChanged();
     void searchStrategyChanged();
     void busyChanged();
+    void libraryFolderChanged();
 
 private slots:
     void onImportProgress(const QString &text);
@@ -144,9 +148,6 @@ private:
     // Ids currently in the reading queue, so the grid can show it per book
     // without a query per row -- built once per reload, not per row.
     QSet<qint64> m_queued;
-    // Ids from a library question. Non-empty means the grid is showing an
-    // answer rather than a filter.
-    QList<qint64> m_ranked;
 
     int m_count = 0;
     QString m_statusLine;
@@ -154,6 +155,7 @@ private:
     QString m_search;
     QString m_searchStrategy;
     bool m_busy = false;
+    QString m_libraryFolder;
 
     // The most recently started import thread, tracked only so the
     // destructor can quit() and wait() it if the app closes mid-import --

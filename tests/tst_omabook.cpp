@@ -13,8 +13,6 @@
 #include "test_repo.h"
 #include "test_import.h"
 #include "test_parsers.h"
-#include "test_ai.h"
-#include "test_tts.h"
 
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
@@ -27,7 +25,5 @@ int main(int argc, char *argv[]) {
     { RepoTest t;    run(&t); }
     { ImportTest t;  run(&t); }
     { ParsersTest t; run(&t); }
-    { AiTest t;      run(&t); }
-    { TtsTest t;     run(&t); }
     return status;
 }

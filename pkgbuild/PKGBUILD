@@ -16,19 +16,9 @@ depends=(
   'poppler'
   'qt6-base'
   'qt6-declarative'
-  # Without the ffmpeg backend QMediaPlayer plays nothing at all, and reports
-  # no error while doing it -- reading aloud is simply silent.
-  'qt6-multimedia'
-  'qt6-multimedia-ffmpeg'
   # Some EPUB covers are WebP. Without this, QImageReader decodes them to
   # nothing and the book gets no cover, again with no error.
   'qt6-imageformats'
-  # Reader.qml imports QtTextToSpeech. An unresolvable QML import is not an
-  # error the app can see: the reader silently fails to load and a book opens
-  # onto an empty pane. Nothing catches it earlier either -- the module is
-  # loaded as a QML plugin, so the binary does not link it and the build
-  # succeeds without it.
-  'qt6-speech'
   'qt6-svg'
   'qt6-webchannel'
   'qt6-webengine'
@@ -40,11 +30,7 @@ makedepends=('qt6-base' 'git')
 # Everything the app can live without. The library, reader, search, highlights
 # and import all work with none of these installed.
 optdepends=(
-  'ollama: local summaries, questions and search indexing'
-  'docker: local text-to-speech via the Kokoro container'
   'calibre: extract MOBI and AZW3 text for search and questions'
-  'speech-dispatcher: fallback system voice when Kokoro is not running'
-  'flite: fallback system voice, if speech-dispatcher is not wanted'
 )
 
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
