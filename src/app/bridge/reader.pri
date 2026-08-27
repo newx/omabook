@@ -1,4 +1,5 @@
-# Filled in as this bridge is ported. See TODO.md.
+HEADERS += \
+    $$PWD/readerbridge.h
 
-HEADERS +=
-SOURCES +=
+SOURCES += \
+    $$PWD/readerbridge.cpp

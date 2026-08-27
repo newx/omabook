@@ -401,6 +401,17 @@ the delegate and nothing tells you why. Bracket every structural change with
 row-count change corrupts the view. A full re-query is
 `beginResetModel`/`endResetModel`, which is correct and simplest.
 
+**A multi-word property exposed to QML is `snake_case`; an invokable is
+`camelCase`.** `theme_name`, `last_cfi`, `pdf_page`, `status_line`,
+`categories_json`, `available_providers` — but `setFilterAndReload`,
+`readerUrlFor`, `startReading`. This is not a style choice: cxx-qt never
+camelCased a `#[qproperty]` name while every invokable carried an explicit
+`#[cxx_name]`, so the ported QML reads exactly these tokens and the QML is the
+contract. `Q_PROPERTY` lets the token and the accessors differ, so the C++ side
+stays idiomatic: `Q_PROPERTY(QString theme_name READ themeName NOTIFY
+themeNameChanged)`. Get it wrong and the binding reads `undefined` with no
+warning at any stage.
+
 **Do not return `QObject *` from a `Q_INVOKABLE`** unless you have called
 `QQmlEngine::setObjectOwnership(obj, QQmlEngine::CppOwnership)` — otherwise the
 QML garbage collector takes ownership and deletes your backend out from under

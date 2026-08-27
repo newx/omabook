@@ -1,4 +1,7 @@
-# Filled in as this bridge is ported. See TODO.md.
+HEADERS += \
+    $$PWD/ttscontroller.h \
+    $$PWD/ttsworker.h
 
-HEADERS +=
-SOURCES +=
+SOURCES += \
+    $$PWD/ttscontroller.cpp \
+    $$PWD/ttsworker.cpp

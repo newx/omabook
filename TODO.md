@@ -167,7 +167,7 @@ and it is the cheapest place to be wrong.
       Library-of-Congress head extraction, `looksLikeAName` (2–3 capitalised
       words, none fully uppercase) excluding proofreader credits, and title
       casing that preserves inner capitals
-- [ ] **`import/pipeline.{h,cpp}`** — the chain, per-file isolation so one bad
+- [x] **`import/pipeline.{h,cpp}`** — the chain, per-file isolation so one bad
       book does not abort a run, category from the first subdirectory below the
       scan root, subject tags capped at 6 and filtered for catalogue noise,
       and an `ImportReport` naming only what happened
@@ -226,14 +226,14 @@ Still no Qt Quick. This is the rest of `omabook-core`.
 - [x] **`ai/anthropic.{h,cpp}`** — `POST /v1/messages` with `x-api-key` and
       `anthropic-version: 2023-06-01`, `max_tokens: 2048`. **`stop_reason ==
       "refusal"` on a 200 is an error.** `available()` makes no request
-- [ ] **`ai/indexer.{h,cpp}`** — paragraph packing at 1200 target / 120 minimum
+- [x] **`ai/indexer.{h,cpp}`** — paragraph packing at 1200 target / 120 minimum
       with a hard split past 2×; embedding only chunks with no row yet, so a run
       resumes; a cancel predicate checked per chunk; metadata embedding skipped
       when the source hash is unchanged
-- [ ] **`ai/assistant.{h,cpp}`** — three scopes with `so_far` the default for an
+- [x] **`ai/assistant.{h,cpp}`** — three scopes with `so_far` the default for an
       unrecognised value, 8 passages, 20 library candidates, excerpts flattened
       and truncated to 160 characters, provider selection through the policy
-- [ ] **`services.{h,cpp}`** — `systemctl --user start ollama.service` then
+- [x] **`services.{h,cpp}`** — `systemctl --user start ollama.service` then
       `ollama serve` detached; `docker start omabook_kokoro` then
       `docker compose up -d kokoro`. A missing tool is reported before anything
       is run, waiting gives up rather than hanging, and every failure message
@@ -315,7 +315,7 @@ The first phase with a window in it.
 - [ ] **`bridge/sidebarmodel.{h,cpp}`** — the five counts plus `categoriesJson`
       and `tagsJson`. Deliberately not two more list models: they are small,
       read-only and rebuilt wholesale. Build the JSON with `QJsonDocument`
-- [ ] **`bridge/notesmodel.{h,cpp}`** — roles 256–263: `noteId`, `bookId`,
+- [x] **`bridge/notesmodel.{h,cpp}`** — roles 256–263: `noteId`, `bookId`,
       `bookTitle`, `quote`, `body`, `cfi`, `isHighlight`, `createdAt` (the date
       portion only). `saveAnnotation` returning the new id or 0, `setBody`,
       `remove`, `annotationsJson` skipping notes with no CFI
@@ -336,7 +336,7 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [ ] Vendor foliate-js into `assets/reader/` (gitignored; `bin/install` fetches it)
 - [ ] Copy `reader.html`, `js-polyfills.js`, `pdf-worker-shim.mjs` across
       **unchanged**
-- [ ] **`bridge/readerbridge.{h,cpp}`** — `lastCfi`, `lastFraction`, `chapter`,
+- [x] **`bridge/readerbridge.{h,cpp}`** — `lastCfi`, `lastFraction`, `chapter`,
       `pdfPage`, `error`, `connected`; `pageChanged`, `readerReady`,
       `readerFailed`, `pageText`, `saveHighlight`, `requestNote`; and the
       `relocated()` / `highlightRequested` / `noteRequested` signals
@@ -360,7 +360,7 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 
 ## Phase P7 — Reading aloud and the assistant (§5.4–5.8)
 
-- [ ] **`bridge/ttscontroller.{h,cpp}`** — `speaking`, `continuous`, `status`,
+- [x] **`bridge/ttscontroller.{h,cpp}`** — `speaking`, `continuous`, `status`,
       `engine`, `chunksLeft`, `paused`, `speed`, `voice`, `voices`; the
       `playAudio`, `speakSystem`, `needNextPage`, `finished`, `pauseRequested`
       and `stopPlayback` signals; `startReading`, `continueWithPage`,

@@ -6,7 +6,10 @@
 #include <QQmlContext>
 #include <QtWebEngineQuick>
 
+#include "bridge/notesmodel.h"
+#include "bridge/readerbridge.h"
 #include "bridge/thememodel.h"
+#include "bridge/ttscontroller.h"
 
 // The QML module the .qml files import. Kept from the Rust build so the
 // existing `import com.omabook.app` lines still resolve.
@@ -32,6 +35,9 @@ int main(int argc, char *argv[]) {
     // TtsController exist more than once with independent state (SPEC 5.13),
     // which a context property could not do.
     qmlRegisterType<ThemeModel>(QML_URI, 1, 0, "ThemeModel");
+    qmlRegisterType<NotesModel>(QML_URI, 1, 0, "NotesModel");
+    qmlRegisterType<ReaderBridge>(QML_URI, 1, 0, "ReaderBridge");
+    qmlRegisterType<TtsController>(QML_URI, 1, 0, "TtsController");
 
     // A pragma Singleton is not resolved by the implicit directory import the
     // way an ordinary sibling component is; without this it reads as

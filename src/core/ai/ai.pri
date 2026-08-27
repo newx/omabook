@@ -1,6 +1,5 @@
-# AI subsystem: policy, power, prompts, vector search, and the two provider
-# implementations. indexer.* and assistant.* are a later round -- see
-# TODO.md.
+# AI subsystem: policy, power, prompts, vector search, the two provider
+# implementations, chunking/embedding, and the assistant.
 
 HEADERS += \
     $$PWD/anthropic.h \
@@ -9,7 +8,9 @@ HEADERS += \
     $$PWD/power.h \
     $$PWD/prompts.h \
     $$PWD/provider.h \
-    $$PWD/vectors.h
+    $$PWD/vectors.h \
+    $$PWD/indexer.h \
+    $$PWD/assistant.h
 
 SOURCES += \
     $$PWD/anthropic.cpp \
@@ -18,4 +19,6 @@ SOURCES += \
     $$PWD/power.cpp \
     $$PWD/prompts.cpp \
     $$PWD/provider.cpp \
-    $$PWD/vectors.cpp
+    $$PWD/vectors.cpp \
+    $$PWD/indexer.cpp \
+    $$PWD/assistant.cpp

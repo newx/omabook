@@ -17,7 +17,12 @@ class ThemeModel : public QObject {
     // What that resolves to right now.
     Q_PROPERTY(bool dark READ dark NOTIFY darkChanged)
     Q_PROPERTY(QString accent READ accent NOTIFY accentChanged)
-    Q_PROPERTY(QString themeName READ themeName NOTIFY themeNameChanged)
+    // Snake case, and deliberately: the QML reads `themeModel.theme_name`,
+    // because cxx-qt never camelCased a multi-word qproperty and the ported
+    // QML carries those names byte-for-byte. The C++ accessors stay camelCase;
+    // only the QML-visible token differs. Renaming it here breaks the binding
+    // silently -- an undefined read, no warning (CLAUDE.md, "Traps").
+    Q_PROPERTY(QString theme_name READ themeName NOTIFY themeNameChanged)
 
 public:
     explicit ThemeModel(QObject *parent = nullptr);

@@ -12,12 +12,22 @@
 #include <QTemporaryDir>
 #include <QVector>
 
+#include "core/db/database.h"
 #include "core/import/classify.h"
 #include "core/import/covers.h"
 #include "core/import/hash.h"
 #include "core/import/metadata.h"
+#include "core/import/pipeline.h"
 #include "core/import/scanner.h"
+#include "core/repo/bookrepository.h"
+#include "core/repo/taxonomy.h"
 #include "core/result.h"
+
+// synthesizeMobi() and writeTempFile() -- the synthetic-MOBI byte layout
+// this file's flagship end-to-end test needs -- live in test_parsers.h.
+// #pragma once there means including it here does not duplicate them when
+// tst_omabook.cpp includes test_parsers.h in its own right.
+#include "test_parsers.h"
 
 namespace {
 
@@ -331,5 +341,141 @@ private slots:
         QCOMPARE(head(QStringLiteral("Astronomy -- Early works to 1800")), QStringLiteral("Astronomy"));
         QCOMPARE(head(QStringLiteral("Fiction--History")), QStringLiteral("Fiction"));
         QCOMPARE(head(QStringLiteral("  Plain  ")), QStringLiteral("Plain"));
+    }
+
+    // --- import/pipeline -----------------------------------------------
+
+    void summaryMentionsOnlyWhatHappened() {
+        ImportReport clean;
+        clean.imported = 3;
+        QCOMPARE(clean.summary(), QStringLiteral("3 imported"));
+
+        ImportReport messy;
+        messy.imported = 1;
+        messy.alreadyPresent = 2;
+        messy.failed.append(qMakePair(QStringLiteral("/x.epub"), QStringLiteral("boom")));
+        QCOMPARE(messy.summary(), QStringLiteral("1 imported, 2 already present, 1 failed"));
+    }
+
+    void categoryComesFromTheFirstSubdirectory() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        // Two levels deep on purpose: only the top level should name the
+        // category, matching the Rust reference's
+        // category_from_path() test.
+        writeFile(dir.filePath(QStringLiteral("Fiction/scifi/dune.epub")), QByteArray(2048, 'x'));
+
+        auto db = Database::openForTest();
+        const Result<ImportReport> report =
+                importDirectory(db->connection(), dir.path(), [](int, int, const QString &) { });
+        QVERIFY(report.isOk());
+        QCOMPARE(report.value().imported, 1);
+
+        CategoryRepository categories(db->connection());
+        const Result<QList<TaxonomyEntry>> entries = categories.listWithCounts();
+        QVERIFY(entries.isOk());
+        QCOMPARE(entries.value().size(), 1);
+        QCOMPARE(entries.value().at(0).name, QStringLiteral("Fiction"));
+    }
+
+    void aBookLooseInTheRootHasNoCategory() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        writeFile(dir.filePath(QStringLiteral("dune.epub")), QByteArray(2048, 'x'));
+
+        auto db = Database::openForTest();
+        const Result<ImportReport> report =
+                importDirectory(db->connection(), dir.path(), [](int, int, const QString &) { });
+        QVERIFY(report.isOk());
+        QCOMPARE(report.value().imported, 1);
+
+        CategoryRepository categories(db->connection());
+        const Result<QList<TaxonomyEntry>> entries = categories.listWithCounts();
+        QVERIFY(entries.isOk());
+        QVERIFY(entries.value().isEmpty());
+    }
+
+    void importingAMissingDirectoryIsAnEmptyRunNotAnError() {
+        auto db = Database::openForTest();
+        const Result<ImportReport> report = importDirectory(
+                db->connection(), QStringLiteral("/nonexistent/library"), [](int, int, const QString &) { });
+        QVERIFY(report.isOk());
+        QCOMPARE(report.value().scanned, 0);
+        QCOMPARE(report.value().imported, 0);
+    }
+
+    // The case the classifier exists for: a flat folder, no sorting, and a
+    // MOBI -- which used to import as its filename with nothing attached.
+    void aMobiInAFlatFolderGetsItsTitleCategoryAndTagsFromTheFile() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+
+        QByteArray bytes = synthesizeMobi(QStringLiteral("The Dispossessed"),
+                { { 100, QStringLiteral("Ursula K. Le Guin") }, // AUTHOR
+                  { 105, QStringLiteral("FICTION / Science Fiction / General") }, // SUBJECT
+                  { 105, QStringLiteral("Anarchism -- Fiction") } });
+        // Past the scanner's size floor; the text record is never parsed.
+        if (bytes.size() < 1025)
+            bytes.append(QByteArray(1025 - bytes.size(), ' '));
+        writeFile(dir.filePath(QStringLiteral("the_dispossessed.mobi")), bytes);
+
+        auto db = Database::openForTest();
+        const Result<ImportReport> report =
+                importDirectory(db->connection(), dir.path(), [](int, int, const QString &) { });
+        QVERIFY(report.isOk());
+        QCOMPARE(report.value().imported, 1);
+        QVERIFY(report.value().failed.isEmpty());
+
+        BookRepository books(db->connection());
+        const Result<QList<Book>> listed = books.list(LibraryFilter::all(), BookSort::Title);
+        QVERIFY(listed.isOk());
+        QCOMPARE(listed.value().size(), 1);
+        const Book &book = listed.value().at(0);
+        QCOMPARE(book.title, QStringLiteral("The Dispossessed"));
+        QCOMPARE(book.authors, QStringList({ QStringLiteral("Ursula K. Le Guin") }));
+
+        CategoryRepository categories(db->connection());
+        const Result<QList<TaxonomyEntry>> cats = categories.listWithCounts();
+        QVERIFY(cats.isOk());
+        QCOMPARE(cats.value().size(), 1);
+        QCOMPARE(cats.value().at(0).name, QStringLiteral("Science Fiction"));
+
+        TagRepository tags(db->connection());
+        const Result<QList<TaxonomyEntry>> tagList = tags.listWithCounts();
+        QVERIFY(tagList.isOk());
+        bool foundTag = false;
+        for (const TaxonomyEntry &entry : tagList.value()) {
+            if (entry.name == QStringLiteral("Anarchism -- Fiction"))
+                foundTag = true;
+        }
+        QVERIFY2(foundTag, "expected the taggable subject to survive as a tag");
+    }
+
+    // Not in the Rust suite: the port adds an explicit guarantee that one
+    // unreadable file cannot cost the user their whole import.
+    void aFailingBookDoesNotAbortTheRun() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        writeFile(dir.filePath(QStringLiteral("good.epub")), QByteArray(2048, 'x'));
+
+        const QString corruptPath = dir.filePath(QStringLiteral("corrupt.epub"));
+        writeFile(corruptPath, QByteArray(2048, 'y'));
+        // No read permission makes hashFile() fail during import, which is
+        // this test's stand-in for "any one step of the chain can fail".
+        QVERIFY(QFile::setPermissions(corruptPath, QFileDevice::Permissions()));
+
+        auto db = Database::openForTest();
+        const Result<ImportReport> report =
+                importDirectory(db->connection(), dir.path(), [](int, int, const QString &) { });
+
+        // Restore permissions before any assertion can early-return, so the
+        // QTemporaryDir can always clean itself up.
+        QFile::setPermissions(corruptPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+
+        QVERIFY(report.isOk());
+        QCOMPARE(report.value().scanned, 2);
+        QCOMPARE(report.value().imported, 1);
+        QCOMPARE(report.value().failed.size(), 1);
+        QCOMPARE(QFileInfo(report.value().failed.at(0).first).fileName(), QStringLiteral("corrupt.epub"));
     }
 };

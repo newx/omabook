@@ -4,13 +4,17 @@
 
 #include <QByteArray>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QVector>
 
 #include "core/ai/anthropic.h"
+#include "core/ai/assistant.h"
+#include "core/ai/indexer.h"
 #include "core/ai/ollama.h"
 #include "core/ai/policy.h"
 #include "core/ai/power.h"
@@ -18,6 +22,7 @@
 #include "core/ai/provider.h"
 #include "core/ai/vectors.h"
 #include "core/result.h"
+#include "core/services.h"
 
 class AiTest : public QObject {
     Q_OBJECT
@@ -318,6 +323,112 @@ private slots:
 
         Anthropic blank(QStringLiteral("   "), QStringLiteral("m"));
         QVERIFY(!blank.available());
+    }
+
+    // --- ai/indexer --------------------------------------------------------
+
+    void paragraphsArePackedUpToTheTarget() {
+        const QString text =
+                QStringLiteral("alpha ").repeated(100) + QStringLiteral("\n\n") + QStringLiteral("beta ").repeated(100);
+        const QStringList chunks = Indexer::split(text);
+        QVERIFY(!chunks.isEmpty());
+        for (const QString &chunk : chunks)
+            QVERIFY2(chunk.size() <= Indexer::TARGET_CHUNK_CHARS * 2, "chunk too long");
+    }
+
+    void aShortDocumentIsOneChunk() {
+        const QStringList chunks =
+                Indexer::split(QStringLiteral("A short paragraph that easily fits inside a single chunk of text."));
+        QCOMPARE(chunks.size(), 1);
+    }
+
+    void emptyTextProducesNoChunks() {
+        QVERIFY(Indexer::split(QString()).isEmpty());
+        QVERIFY(Indexer::split(QStringLiteral("\n\n   \n\n")).isEmpty());
+    }
+
+    void noWordsAreLost() {
+        const QString text = QStringLiteral("First paragraph here.\n\nSecond paragraph here.\n\nThird one.");
+        const QString joined = Indexer::split(text).join(QLatin1Char(' '));
+        const QStringList before = text.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+        const QStringList after = joined.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+        QCOMPARE(after, before);
+    }
+
+    void aVeryLongParagraphIsBrokenUp() {
+        const QString text = QStringLiteral("word ").repeated(2000);
+        const QStringList chunks = Indexer::split(text);
+        QVERIFY2(chunks.size() > 1, "one enormous paragraph must still be split");
+    }
+
+    void theSameMetadataHashesTheSame() {
+        QCOMPARE(Indexer::shortHash(QStringLiteral("Moby-Dick. by Melville")),
+                  Indexer::shortHash(QStringLiteral("Moby-Dick. by Melville")));
+        QVERIFY(Indexer::shortHash(QStringLiteral("Moby-Dick")) != Indexer::shortHash(QStringLiteral("Billy Budd")));
+    }
+
+    // --- ai/assistant --------------------------------------------------------
+
+    void anUnknownScopeDefaultsToTheSpoilerFreeOne() {
+        QCOMPARE(Assistant::parseScope(QStringLiteral("so_far")), Scope::SoFar);
+        QCOMPARE(Assistant::parseScope(QString()), Scope::SoFar);
+        QCOMPARE(Assistant::parseScope(QStringLiteral("nonsense")), Scope::SoFar);
+        QCOMPARE(Assistant::parseScope(QStringLiteral("book")), Scope::Book);
+        QCOMPARE(Assistant::parseScope(QStringLiteral("page")), Scope::Page);
+    }
+
+    void excerptsAreFlattenedAndBounded() {
+        const QString longText = QStringLiteral("word ").repeated(100);
+        const QString shortened = Assistant::excerpt(longText);
+        QVERIFY(shortened.size() <= 160);
+        QVERIFY(shortened.endsWith(QStringLiteral("…")));
+        QVERIFY(!shortened.contains(QLatin1Char('\n')));
+    }
+
+    void aShortPassageIsShownWhole() {
+        QCOMPARE(Assistant::excerpt(QStringLiteral("Call me\n Ishmael.")), QStringLiteral("Call me Ishmael."));
+    }
+
+    // --- services ------------------------------------------------------------
+
+    void aMissingToolIsReportedBeforeAnythingIsRun() {
+        // The name is checked, not executed, so this makes no subprocess.
+        QVERIFY(!Services::toolInstalled(QStringLiteral("definitely-not-a-real-command-xyz")));
+    }
+
+    void everyFailureSaysWhatToDo() {
+        const StartFailure failures[] = { StartFailure::missing(QStringLiteral("docker")),
+                                           StartFailure::missing(QStringLiteral("ollama")),
+                                           StartFailure::failed(QStringLiteral("permission denied")),
+                                           StartFailure::neverReady() };
+        for (const StartFailure &failure : failures) {
+            const QString message = failure.message();
+            QVERIFY(!message.isEmpty());
+            QVERIFY2(message.at(0).isUpper() || message.contains(QStringLiteral("permission")),
+                      qPrintable(message));
+        }
+    }
+
+    void errorsAreTrimmedButNotEmptied() {
+        QCOMPARE(Services::firstSentence(QStringLiteral("Error: permission denied")),
+                  QStringLiteral("permission denied"));
+        QCOMPARE(Services::firstSentence(QStringLiteral("   ")), QStringLiteral("the command failed"));
+        const QString longText = QStringLiteral("x").repeated(300);
+        QVERIFY(Services::firstSentence(longText).size() <= 161);
+    }
+
+    void waitingGivesUpRatherThanHanging() {
+        const std::optional<StartFailure> outcome = Services::waitUntil([]() { return false; }, 600);
+        QVERIFY(outcome.has_value());
+        QCOMPARE(outcome->kind(), StartFailureKind::NeverReady);
+    }
+
+    void waitingReturnsAsSoonAsItIsReady() {
+        QElapsedTimer timer;
+        timer.start();
+        const std::optional<StartFailure> outcome = Services::waitUntil([]() { return true; }, 30000);
+        QVERIFY(!outcome.has_value());
+        QVERIFY(timer.elapsed() < 2000);
     }
 
 private:

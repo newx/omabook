@@ -591,6 +591,13 @@ The QML moves across nearly intact. The edits:
 - **Argument parsing moves into `main()`.** The Rust build read
   `Qt.application.arguments` from QML because it had no argument handling of its
   own; C++ has `QCoreApplication::arguments()` and should use it.
+- **Property names stay `snake_case`; invokables stay `camelCase`.** cxx-qt
+  never camelCased a `#[qproperty]`, while every invokable carried an explicit
+  `#[cxx_name]`, so the QML reads `bridgeObject.last_cfi` and
+  `library.status_line` but calls `library.setFilterAndReload(...)`. The QML is
+  ported unchanged and is therefore the contract; `Q_PROPERTY` lets the exposed
+  token and the C++ accessors differ, so the C++ side stays idiomatic. A
+  camelCased property token here is a binding that silently reads `undefined`.
 - **The two singletons need an explicit import.** `Theme.qml` and `Icons.qml`
   are `pragma Singleton`. cxx-qt put every QML file in one module, so they were
   reachable with no `import` line at all. A flat `qrc:` resolves ordinary

@@ -1,4 +1,5 @@
-# Filled in as this bridge is ported. See TODO.md.
+HEADERS += \
+    $$PWD/notesmodel.h
 
-HEADERS +=
-SOURCES +=
+SOURCES += \
+    $$PWD/notesmodel.cpp
