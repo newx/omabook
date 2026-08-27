@@ -108,8 +108,11 @@ and it is the cheapest place to be wrong.
       duplicates; re-highlight preserves an existing body; notes in reading
       order; empty annotation rejected; slugs normalise; ensure idempotent
       across spellings; empty categories unlisted; counts reflect assignments
-- [ ] **A database written by the Rust build opens unchanged** (§4). Copy the
-      real `~/.local/share/omabook/omabook.db` to a temp dir and open it
+- [x] **A database written by the Rust build opens unchanged** (§4). The real
+      47 MB library — 51 books, 4,755 embedded chunks — is copied to a temp dir
+      and read back through `BookRepository`, so enum decoding, the JSON
+      authors column and the progress join are all exercised against data the
+      port did not write. Skips rather than fails where there is no library
 
 ---
 

@@ -30,6 +30,16 @@ fi
 JOBS="$(nproc 2>/dev/null || echo 1)"
 
 mkdir -p "$BUILD_DIR"
+
+# Two `make -j` runs in one build directory corrupt each other's object files,
+# and the failure looks like a compile error in code that is fine. Serialise on
+# the build directory so concurrent invocations queue instead.
+if command -v flock >/dev/null 2>&1 && [ -z "${OMABOOK_BUILD_LOCKED:-}" ]; then
+  OMABOOK_BUILD_LOCKED=1
+  export OMABOOK_BUILD_LOCKED
+  exec flock "$BUILD_DIR" "$0" "$@"
+fi
+
 cd "$BUILD_DIR"
 
 "$QMAKE" "$ROOT/omabook.pro" "$CONFIG_ARG"

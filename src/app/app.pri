@@ -11,3 +11,10 @@ SOURCES += \
     $$PWD/assets.cpp \
     $$PWD/bridge/thememodel.cpp \
     $$PWD/main.cpp
+
+# One file list per bridge, for the same reason core is split per subsystem.
+include($$PWD/bridge/library.pri)
+include($$PWD/bridge/notes.pri)
+include($$PWD/bridge/reader.pri)
+include($$PWD/bridge/speech.pri)
+include($$PWD/bridge/assistant.pri)

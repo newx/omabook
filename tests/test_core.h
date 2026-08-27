@@ -14,6 +14,7 @@
 #include "core/db/migrations.h"
 #include "core/models/book.h"
 #include "core/omarchy.h"
+#include "core/repo/bookrepository.h"
 #include "core/result.h"
 
 class CoreTest : public QObject {
@@ -258,6 +259,49 @@ private slots:
             // one per file touched.
             QCOMPARE(changes.count(), 1);
             changes.clear();
+        }
+    }
+
+    // --- parity with the Rust build ---------------------------------
+
+    // The C++ port must read the library the Rust build wrote, unchanged.
+    // The five migrations came across byte-for-byte precisely so that this
+    // holds, and nothing else proves it as directly as opening the real file.
+    //
+    // Skips rather than fails when there is no library on this machine: a
+    // test may not depend on a file outside the repository.
+    void opensADatabaseWrittenByTheRustBuild() {
+        const QString source = QDir::homePath()
+            + QStringLiteral("/.local/share/omabook/omabook.db");
+        if (!QFileInfo::exists(source))
+            QSKIP("no existing omabook library on this machine");
+
+        QTemporaryDir scratch;
+        QVERIFY(scratch.isValid());
+        const QString copy = scratch.filePath(QStringLiteral("omabook.db"));
+        QVERIFY2(QFile::copy(source, copy), "could not copy the library");
+        // The copy is read-write; a snapshot without its -wal is still
+        // consistent because the Rust build checkpoints on a clean exit.
+        QVERIFY(QFile::setPermissions(copy, QFile::ReadOwner | QFile::WriteOwner));
+
+        auto db = Database::openForTest(copy);
+        QVERIFY2(db != nullptr, "the port could not open the Rust build's database");
+
+        QSqlQuery version(db->connection());
+        QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
+        QVERIFY(version.next());
+        QCOMPARE(version.value(0).toLongLong(), SCHEMA_VERSION);
+
+        // And the rows come back through the ported repository, not just the
+        // raw file: enum decoding, the JSON authors column and the progress
+        // join are all exercised by this one call.
+        BookRepository books(db->connection());
+        const auto listed = books.list(LibraryFilter::all(), BookSort::RecentlyAdded);
+        QVERIFY(listed.isOk());
+        QVERIFY(!listed.value().isEmpty());
+        for (const Book &book : listed.value()) {
+            QVERIFY(!book.title.isEmpty());
+            QVERIFY(book.progress >= 0.0 && book.progress <= 1.0);
         }
     }
 };
