@@ -1,4 +1,11 @@
-# Filled in as this subsystem is ported. See TODO.md.
+HEADERS += \
+    $$PWD/bookrepository.h \
+    $$PWD/noterepository.h \
+    $$PWD/settingsrepository.h \
+    $$PWD/taxonomy.h
 
-HEADERS +=
-SOURCES +=
+SOURCES += \
+    $$PWD/bookrepository.cpp \
+    $$PWD/noterepository.cpp \
+    $$PWD/settingsrepository.cpp \
+    $$PWD/taxonomy.cpp

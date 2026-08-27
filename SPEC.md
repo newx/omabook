@@ -584,6 +584,10 @@ The QML moves across nearly intact. The edits:
   moves across unchanged**, including its `PROBE-*:` and `VERIFY *:` log
   prefixes and exit codes. It is how the app is smoke-tested end to end without
   a screenshot, and external tooling greps for those exact strings.
+- **The hand-rolled percent-encoder is deleted.** `QUrl::toPercentEncoding`
+  keeps exactly `A-Za-z0-9-_.~` literal and hex-encodes every other byte, which
+  is byte-for-byte what the Rust helper did, UTF-8 paths included. Verified,
+  not assumed.
 - **Argument parsing moves into `main()`.** The Rust build read
   `Qt.application.arguments` from QML because it had no argument handling of its
   own; C++ has `QCoreApplication::arguments()` and should use it.

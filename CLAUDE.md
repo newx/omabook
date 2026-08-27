@@ -553,9 +553,15 @@ The short list of things that will cost you an hour each.
   It is stored-and-deflate only with no zip64, which is exactly what EPUB
   permits. Rebuild after a `qt6-base` update; `libzip` is the escape hatch if it
   is ever removed.
-- **`qWarning()` output is visible; `qDebug()` may not be.** A release build with
-  default logging rules can swallow `qDebug`, which makes a working spike look
-  like a failing one.
+- **Qt logs to journald, not stderr, when there is no tty.** Arch builds
+  `qt6-base` with journald support, and Qt then routes *everything* —
+  `qDebug`, `qWarning`, `qCritical` — to the journal whenever stderr is not a
+  terminal. Run the app from a script, a pipe, or an agent and it prints
+  absolutely nothing, including the message that would have told you why it
+  exited. Export **`QT_FORCE_STDERR_LOGGING=1`** for any run whose output you
+  intend to read, or read it back with `journalctl --user`. This is the single
+  most misleading thing in this environment: silence is not success, and it is
+  not failure either.
 - **Redirect spike output to a file rather than piping it.** stdout is block
   buffered, and a `timeout` SIGTERM discards the buffer.
 

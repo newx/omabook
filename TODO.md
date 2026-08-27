@@ -76,7 +76,7 @@ and it is the cheapest place to be wrong.
   - [ ] `Book::readablePath()` prefers `readingPath`; `authorLine()` joins with
         `", "` and falls back to `"Unknown author"`
   - [ ] `authors` serialises to and from a **JSON array as text**
-- [ ] **`src/core/repo/bookrepository.{h,cpp}`** ← `repo/book_repo.rs` (889 lines,
+- [x] **`src/core/repo/bookrepository.{h,cpp}`** ← `repo/book_repo.rs` (889 lines,
       the biggest single file in the core)
   - [ ] `list(filter, sort)`, `find`, `findByHash`, `count`, `counts`, `listIds`
   - [ ] `insert` idempotent on `file_hash`, returning the existing id
@@ -88,14 +88,14 @@ and it is the cheapest place to be wrong.
   - [ ] `toggleFavorite`, `toggleQueued`, `isQueued`, `reorderQueue`
         (renumbering gaplessly from 1), `delete`
   - [ ] The Queue filter overrides the requested sort with `position`
-- [ ] **`src/core/repo/noterepository.{h,cpp}`** ← `repo/notes.rs`
+- [x] **`src/core/repo/noterepository.{h,cpp}`** ← `repo/notes.rs`
   - [ ] `upsert` matching on `(book_id, cfi)`, `COALESCE`-preserving fields left
         unset, rejecting an annotation with neither quote nor body
   - [ ] `forBook` ordered by `page_fraction` then `created_at`; `all` newest first
-- [ ] **`src/core/repo/taxonomy.{h,cpp}`** ← `repo/taxonomy.rs` — `slugify`,
+- [x] **`src/core/repo/taxonomy.{h,cpp}`** ← `repo/taxonomy.rs` — `slugify`,
       `ensure` (find-or-create by slug), `attach`, `listWithCounts`
-- [ ] **`src/core/repo/settingsrepository.{h,cpp}`** ← `repo/settings.rs`
-- [~] **Tests** (14 of ~30 written — db, migrations, models): schema version after migrate and after migrating twice;
+- [x] **`src/core/repo/settingsrepository.{h,cpp}`** ← `repo/settings.rs`
+- [x] **Tests** (30 in RepoTest, 20 in CoreTest): schema version after migrate and after migrating twice;
       downgrade refused; foreign keys enforced; idempotent insert; authors round
       trip; case-insensitive title sort; first progress moves to reading;
       threshold finishes; fraction clamped; `vacuum_into` snapshot reopens;
@@ -115,50 +115,50 @@ and it is the cheapest place to be wrong.
 
 ## Phase P2 — Import pipeline (§5.2)
 
-- [ ] **`import/scanner.{h,cpp}`** — recursive, no symlinks, skip dotfile
+- [x] **`import/scanner.{h,cpp}`** — recursive, no symlinks, skip dotfile
       components, known extensions only, drop files under 1024 bytes, sorted by
       path. A missing root is empty, not an error
-- [ ] **`import/hash.{h,cpp}`** — SHA-256 (`QCryptographicHash`) over the file
+- [x] **`import/hash.{h,cpp}`** — SHA-256 (`QCryptographicHash`) over the file
       length as eight little-endian bytes then the first 1 MiB
-- [ ] **`import/metadata.{h,cpp}`** — `FileMetadata`, `Cover`, and the junk-title
+- [x] **`import/metadata.{h,cpp}`** — `FileMetadata`, `Cover`, and the junk-title
       rules: under 3 characters; starting `pii:`, `the project gutenberg ebook #`,
       `microsoft word`, `untitled`; ending `.doc`/`.pdf`/`.indd`/`.qxd`; or fewer
       than half the characters alphabetic. Falls back to a tidied filename
-- [ ] **`import/epub.{h,cpp}`** ← `import/epub.rs` (535 lines)
-  - [ ] `QZipReader`; `container.xml` → OPF rootfile → manifest, spine, metadata
-  - [ ] **`QXmlStreamReader` matched on `namespaceUri()` + local name**, `href`
+- [x] **`import/epub.{h,cpp}`** ← `import/epub.rs` (535 lines)
+  - [x] `QZipReader`; `container.xml` → OPF rootfile → manifest, spine, metadata
+  - [x] **`QXmlStreamReader` matched on `namespaceUri()` + local name**, `href`
         and `media-type` in the empty namespace, and a
         `QXmlStreamEntityResolver` for undeclared entities (§5.2)
-  - [ ] Cover in priority order: EPUB 3 `properties="cover-image"`; EPUB 2
+  - [x] Cover in priority order: EPUB 3 `properties="cover-image"`; EPUB 2
         `<meta name="cover">` resolved through the manifest; a manifest item
         whose id or href contains "cover" with an image extension
-  - [ ] ISBN-13 accepted only with 13 digits **and** a hint — an `isbn` scheme, a
+  - [x] ISBN-13 accepted only with 13 digits **and** a hint — an `isbn` scheme, a
         raw value containing "isbn", or a `97` prefix
-  - [ ] `resolveRelative` — hrefs are relative to the OPF's directory, joined by
+  - [x] `resolveRelative` — hrefs are relative to the OPF's directory, joined by
         string, `.` dropped and `..` popping
-  - [ ] `stripMarkup` — skip `<script>`/`<style>` by depth, newline on block
+  - [x] `stripMarkup` — skip `<script>`/`<style>` by depth, newline on block
         tags, unescape text
-  - [ ] **Caps re-checked against the actual read**, never the zip header: 12 MiB
+  - [x] **Caps re-checked against the actual read**, never the zip header: 12 MiB
         a cover, 32 MiB an entry, 256 MiB a book
-- [ ] **`import/mobi.{h,cpp}`** ← `import/mobi.rs` — PalmDB record 0, `BOOKMOBI`
+- [x] **`import/mobi.{h,cpp}`** ← `import/mobi.rs` — PalmDB record 0, `BOOKMOBI`
       magic at 60, `MOBI` magic at record0+16, encoding 65001 → UTF-8 else
       byte-as-codepoint, EXTH block when `flags & 0x40`, record types
       100/101/103/104/105/106/503/524, a record length under 8 breaking the loop.
       All access bounds-checked; a truncated file is an error, never a crash
-- [ ] **`import/pdf.{h,cpp}`** — `QProcess` for `pdfinfo`, `pdftoppm -png -f 1 -l 1
+- [x] **`import/pdf.{h,cpp}`** — `QProcess` for `pdfinfo`, `pdftoppm -png -f 1 -l 1
       -r 80 -singlefile`, `pdftotext -f N -l M -layout … -`. **Connect
       `errorOccurred`, not only `finished`**, and give every process a timeout
-  - [ ] The text-quality heuristic with its exact thresholds (§7.2): three
+  - [x] The text-quality heuristic with its exact thresholds (§7.2): three
         samples at 1/4, 1/2, 3/4; mean under 120 characters → `none`; symbol
         ratio over 0.08 or word-like ratio under 0.45 → `poor`; repeated-line
         ratio over 0.35 → `poor`; under 40 non-space characters is inconclusive
-- [ ] **`import/covers.{h,cpp}`** — content-addressed at
+- [x] **`import/covers.{h,cpp}`** — content-addressed at
       `{data}/covers/{hash}.{ext}`, extension sanitised to five lowercase ASCII
       alphanumerics defaulting to `jpg`
-  - [ ] **New in the port:** thumbnail with `QImageReader`, `setAutoTransform(true)`,
+  - [x] **New in the port:** thumbnail with `QImageReader`, `setAutoTransform(true)`,
         and `setScaledSize` computed from `reader.size()` to fit 320×480,
         written as JPEG quality 85 (§5.2)
-- [ ] **`import/classify.{h,cpp}`** ← `import/classify.rs` — the 26-shelf keyword
+- [x] **`import/classify.{h,cpp}`** ← `import/classify.rs` — the 26-shelf keyword
       table **in its exact order** (specific before general: Science Fiction
       before Fiction, Mathematics before Science), whole-word matching, BISAC and
       Library-of-Congress head extraction, `looksLikeAName` (2–3 capitalised
@@ -168,7 +168,7 @@ and it is the cheapest place to be wrong.
       book does not abort a run, category from the first subdirectory below the
       scan root, subject tags capped at 6 and filtered for catalogue noise,
       and an `ImportReport` naming only what happened
-- [ ] **Tests** (~35): scanner finds and ignores, recurses, skips hidden and
+- [x] **Tests** (28 in ImportTest, 25 in ParsersTest): scanner finds and ignores, recurses, skips hidden and
       truncated, survives a missing root; hash is content- not name-based,
       differs on content, differs on same-prefix-different-length, errors on a
       missing file; junk titles rejected and real ones kept; namespace prefixes
@@ -192,35 +192,35 @@ and it is the cheapest place to be wrong.
 
 Still no Qt Quick. This is the rest of `omabook-core`.
 
-- [ ] **`tts/chunker.{h,cpp}`** — 220 then 600 characters, whitespace collapsed,
+- [x] **`tts/chunker.{h,cpp}`** — 220 then 600 characters, whitespace collapsed,
       sentence terminators consuming trailing quotes/brackets/spaces, word-
       boundary fallback, hard cut for a single over-long word, **splitting on
       character and never byte boundaries**
-- [ ] **`tts/kokoro.{h,cpp}`** — `GET /health`, `GET /v1/audio/voices` (accepting
+- [x] **`tts/kokoro.{h,cpp}`** — `GET /health`, `GET /v1/audio/voices` (accepting
       both the bare-string and object response shapes),
       `POST /v1/audio/speech` with `{model, input, voice, response_format, speed}`.
       Empty text rejected before any request. Output cached to
       `{cache}/tts/{sha256(voice \0 text)[:32]}.wav`
-- [ ] **`ai/vectors.{h,cpp}`** — little-endian float blobs in `QByteArray`
+- [x] **`ai/vectors.{h,cpp}`** — little-endian float blobs in `QByteArray`
       (deep-copied, `memcpy`'d back out, never aliased); cosine returning 0 on
       mismatch rather than NaN; `nearestInBook` with the `ordinal <= n` bound;
       **hybrid blending at weight 0.85 with per-chunk max**; FTS rank normalised
       as `strength / (strength + 4)`; keyword terms `OR`-joined with terms of two
       characters or fewer dropped
-- [ ] **`ai/power.{h,cpp}`** — `/sys/class/power_supply`, reading `type`,
+- [x] **`ai/power.{h,cpp}`** — `/sys/class/power_supply`, reading `type`,
       `online`, `status`, `scope` per supply. An online `Mains` supply wins on a
       first pass before any battery is consulted; `scope=Device` is a peripheral;
       a missing directory is mains
-- [ ] **`ai/policy.{h,cpp}`** — `WorkPolicy::permits` in the exact six-step order
+- [x] **`ai/policy.{h,cpp}`** — `WorkPolicy::permits` in the exact six-step order
       of §5.5, defaulting to off, every refusal carrying a reason
-- [ ] **`ai/prompts.{h,cpp}`** — the four templates **verbatim**, including the
+- [x] **`ai/prompts.{h,cpp}`** — the four templates **verbatim**, including the
       U+2014 em dash in `askBook` and the conditional context lines that leave no
       empty labels
-- [ ] **`ai/ollama.{h,cpp}`** — `GET /api/tags`, `POST /api/generate`
+- [x] **`ai/ollama.{h,cpp}`** — `GET /api/tags`, `POST /api/generate`
       (`num_predict: 500`, `temperature: 0.3`, `stream: false`),
       `POST /api/embeddings`. Strip a `<think>…</think>` preamble. Empty text
       rejected before any request
-- [ ] **`ai/anthropic.{h,cpp}`** — `POST /v1/messages` with `x-api-key` and
+- [x] **`ai/anthropic.{h,cpp}`** — `POST /v1/messages` with `x-api-key` and
       `anthropic-version: 2023-06-01`, `max_tokens: 2048`. **`stop_reason ==
       "refusal"` on a 200 is an error.** `available()` makes no request
 - [ ] **`ai/indexer.{h,cpp}`** — paragraph packing at 1200 target / 120 minimum
@@ -235,7 +235,7 @@ Still no Qt Quick. This is the rest of `omabook-core`.
       `docker compose up -d kokoro`. A missing tool is reported before anything
       is run, waiting gives up rather than hanging, and every failure message
       says what to do
-- [ ] **Tests** (~45): the chunker's eight cases including the multibyte and
+- [x] **Tests** (16 in TtsTest, 37 in AiTest): the chunker's eight cases including the multibyte and
       infinite-loop guards; Kokoro's voice-shape parsing, cache determinism, URL
       normalisation, empty-text guard and unreachable-service behaviour; vectors'
       round trip, truncated blob, identical/opposite/orthogonal scores,
@@ -269,11 +269,11 @@ The first phase with a window in it.
   - [x] **Watch `current/`, not `current/theme/`** — `omarchy-theme-set` deletes
         and renames the child, and a watch on it follows the dead inode (§5.13)
   - [x] A 150 ms settle window coalescing the burst one theme change produces
-- [ ] **`src/app/bridge/thememodel.{h,cpp}`** — `mode`/`dark`/`accent`/`themeName`,
+- [x] **`src/app/bridge/thememodel.{h,cpp}`** — `mode`/`dark`/`accent`/`themeName`,
       `cycleMode`, **`applyMode` (not `setMode` — the property's notifier owns
       that name)**, `followSystemTheme` started from QML rather than the
       constructor, and a refresh that writes **only the fields that changed**
-- [ ] **`src/app/assets.{h,cpp}`** — the four-tier reader-asset search and the
+- [x] **`src/app/assets.{h,cpp}`** — the four-tier reader-asset search and the
       percent-encoded reader URL (§5.3); `composeDir()` for Kokoro
 - [ ] **`src/app/app.qrc`** — every `.qml` aliased flat to `qrc:/`, plus the
       brand mark. **Not** `spike.html` (§5.12)

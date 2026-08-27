@@ -64,3 +64,43 @@ Carried over from the Rust build's Phase 0 and still true: `QT_QPA_PLATFORM=offs
 never loads a `WebEngineView`, and the run is silent rather than failing. Any
 reader verification has to happen on the real Wayland session, and the test
 binary must not depend on the reader.
+
+## Qt logs to journald when there is no tty — and it is silent about it
+
+Not a decision, a trap, and the one that cost the most time. The app was built,
+launched, and exited with status 255 printing **nothing at all** — no warning,
+no `qCritical`, not even the message its own `main()` emits on the failure path.
+A `fprintf(stderr, ...)` on the adjacent line printed fine.
+
+The cause is not the app and not QtWebEngine, which was the first suspect:
+
+```
+$ QT_QPA_PLATFORM=offscreen ./weinit          # qWarning + fprintf, interleaved
+F1: before initialize
+F2: after initialize
+F3: after app
+
+$ QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen ./weinit
+W1: before initialize
+F1: before initialize
+W2: after initialize
+F2: after initialize
+W3: after app
+C3: after app
+F3: after app
+```
+
+Arch builds `qt6-base` with journald support, and Qt's default message handler
+then routes every category — `qDebug`, `qWarning`, `qCritical` — to the journal
+rather than stderr whenever stderr is not a terminal. From an interactive shell
+it looks normal; from a script, a pipe, a CI job or an agent it looks like the
+program has nothing to say.
+
+**Export `QT_FORCE_STDERR_LOGGING=1` for any run whose output you mean to
+read**, or fetch it afterwards with `journalctl --user`. With it set, the same
+silent run reported the real problem immediately:
+
+```
+QQmlApplicationEngine failed to load component
+qrc:/Main.qml:20:5: AiController is not a type
+```
