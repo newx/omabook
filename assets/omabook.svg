@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="52" fill="#101315"/>
+  <!-- An open book: two leaves meeting at a spine. -->
+  <g fill="none" stroke="#cacccc" stroke-width="12"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M128 74c-16-13-40-20-62-20H46v128h20c22 0 46 7 62 20"/>
+    <path d="M128 74c16-13 40-20 62-20h20v128h-20c-22 0-46 7-62 20"/>
+    <path d="M128 74v128"/>
+  </g>
+  <g stroke="#798186" stroke-width="8" stroke-linecap="round">
+    <path d="M74 100h32M74 128h32M150 100h32M150 128h32"/>
+  </g>
+</svg>

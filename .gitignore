@@ -1,0 +1,12 @@
+/build
+/build-tests
+*.o
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+Makefile
+.qmake.stash
+*.db
+*.db-wal
+*.db-shm
+/assets/reader/foliate-js

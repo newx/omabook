@@ -1,0 +1,352 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>omabook reader</title>
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: Canvas; }
+  #view { width: 100%; height: 100%; }
+  #message {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    font: 14px system-ui, sans-serif; color: GrayText;
+    padding: 2rem; text-align: center; white-space: pre-wrap;
+  }
+  #message.show { display: flex; }
+  /* Tap zones for page turns; invisible, and out of the way of text selection
+     in the middle of the page. */
+  .zone { position: absolute; top: 0; bottom: 0; width: 18%; z-index: 5; }
+  #prev-zone { left: 0; } #next-zone { right: 0; }
+
+  /* Selection toolbar: appears beside the selected text, like medialib's. */
+  #sel-toolbar {
+    position: absolute; z-index: 20; display: none;
+    background: Canvas; color: CanvasText;
+    border: 1px solid color-mix(in srgb, CanvasText 28%, transparent);
+    border-radius: 6px; padding: 4px; gap: 4px;
+    box-shadow: none; font: 13px system-ui, sans-serif;
+  }
+  #sel-toolbar.show { display: flex; }
+  #sel-toolbar button {
+    background: transparent; color: inherit; border: 0; cursor: pointer;
+    padding: 6px 10px; border-radius: 4px; font: inherit;
+  }
+  #sel-toolbar button:hover {
+    background: color-mix(in srgb, CanvasText 12%, transparent);
+  }
+</style>
+</head>
+<body>
+  <foliate-view id="view"></foliate-view>
+  <div id="prev-zone" class="zone"></div>
+  <div id="next-zone" class="zone"></div>
+  <div id="message"></div>
+  <div id="sel-toolbar">
+    <button id="btn-highlight">Highlight</button>
+    <button id="btn-note">Note</button>
+  </div>
+
+<!-- Must run before any module that touches pdf.js. -->
+<script src="js-polyfills.js"></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script type="module">
+import { makeBook } from './foliate-js/view.js'
+
+const view = document.getElementById('view')
+const messageEl = document.getElementById('message')
+let bridge = null
+
+const message = (text) => {
+  messageEl.textContent = text
+  messageEl.classList.toggle('show', Boolean(text))
+}
+
+const toolbar = document.getElementById('sel-toolbar')
+
+const params = new URLSearchParams(location.search)
+const bookUrl = params.get('file')
+const startCfi = params.get('cfi') || null
+const isPdf = bookUrl ? /\.pdf(\?|#|$)/i.test(decodeURIComponent(bookUrl)) : false
+
+// The text of what is actually on screen. The range from the relocate event is
+// the most accurate source — it is what foliate itself considers visible — and
+// this is the value every AI and TTS feature is built on (SPEC 5.3).
+const visibleText = (detail) => {
+  try {
+    if (detail?.range) {
+      const text = detail.range.toString().trim()
+      if (text) return text
+    }
+    // A fixed-layout book has no range to give. Its renderer keeps both
+    // halves of a spread in the DOM — and in portrait, one of them hidden —
+    // so the first frame's text is as likely to be the facing page as this
+    // one. For a PDF that guess is unnecessary: Rust extracts the page by
+    // number with pdftotext instead, which is always the page on screen.
+    if (isPdf) return ''
+    const contents = view.renderer?.getContents?.()
+    const doc = Array.isArray(contents) ? contents[0]?.doc : contents?.doc
+    return (doc?.body?.textContent || '').trim()
+  } catch (e) {
+    console.warn('omabook: could not extract page text', e)
+    return ''
+  }
+}
+
+// --- selection, highlights and notes -------------------------------------
+//
+// The selection lives inside the book's iframe document, so the listeners are
+// attached there as each section loads, and coordinates are mapped back into
+// this document before the toolbar is positioned.
+
+let pendingSelection = null
+
+const hideToolbar = () => {
+  toolbar.classList.remove('show')
+  pendingSelection = null
+}
+
+
+const showToolbarFor = (doc, range) => {
+  const text = range.toString().trim()
+  if (!text) { hideToolbar(); return }
+
+  // Without a CFI there is nothing to anchor an annotation to, so the toolbar
+  // stays hidden rather than offering an action that cannot be saved.
+  let cfi = null
+  try { cfi = view.getCFI(currentIndex, range) }
+  catch (e) { console.warn('omabook: getCFI failed', e) }
+  if (!cfi) { hideToolbar(); return }
+
+  pendingSelection = { cfi, text }
+
+  // Map the iframe rect into this document.
+  const rect = range.getBoundingClientRect()
+  const frame = doc.defaultView?.frameElement?.getBoundingClientRect()
+  const left = (frame ? frame.left : 0) + rect.left
+  const top = (frame ? frame.top : 0) + rect.top
+
+  toolbar.classList.add('show')
+  const width = toolbar.offsetWidth || 160
+  const height = toolbar.offsetHeight || 36
+  toolbar.style.left =
+    Math.max(8, Math.min(window.innerWidth - width - 8, left + rect.width / 2 - width / 2)) + 'px'
+  // Prefer above the selection; drop below when there is no room.
+  toolbar.style.top = (top > height + 12 ? top - height - 8 : top + rect.height + 8) + 'px'
+}
+
+let currentIndex = 0
+
+// Turning the page from the keyboard.
+//
+// foliate renders each chapter into an iframe, and key events do not cross
+// that boundary. A handler on this document alone therefore stops working the
+// moment focus moves into the book, which is as soon as anyone clicks the
+// text — so the same handler is bound to every chapter document as it loads.
+const turnPageOnKey = (e) => {
+  // Shift+Arrow extends a selection and the rest belong to shortcuts; none of
+  // them mean "turn the page".
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+
+  const target = e.target
+  if (target?.isContentEditable) return
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? '')) return
+
+  if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+    e.preventDefault()
+    view.next()
+  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    e.preventDefault()
+    view.prev()
+  }
+}
+
+document.addEventListener('keydown', turnPageOnKey)
+
+view.addEventListener('load', (e) => {
+  const doc = e.detail?.doc
+  currentIndex = e.detail?.index ?? currentIndex
+  if (!doc) return
+
+  const check = () => {
+    const sel = doc.getSelection()
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) { hideToolbar(); return }
+    showToolbarFor(doc, sel.getRangeAt(0))
+  }
+
+  // pointerup covers mouse and touch; selectionchange catches keyboard and
+  // handle drags, which do not reliably emit pointerup.
+  doc.addEventListener('pointerup', () => setTimeout(check, 10))
+  doc.addEventListener('selectionchange', () => setTimeout(check, 120))
+  doc.addEventListener('scroll', hideToolbar, { passive: true })
+  doc.addEventListener('keydown', turnPageOnKey)
+})
+
+document.getElementById('btn-highlight').addEventListener('click', () => {
+  if (!pendingSelection || !bridge) return
+  bridge.saveHighlight(pendingSelection.cfi, pendingSelection.text,
+                       view.lastLocation?.fraction ?? 0)
+  hideToolbar()
+})
+
+document.getElementById('btn-note').addEventListener('click', () => {
+  if (!pendingSelection || !bridge) return
+  bridge.requestNote(pendingSelection.cfi, pendingSelection.text,
+                     view.lastLocation?.fraction ?? 0)
+  hideToolbar()
+})
+
+// Paint saved annotations. foliate resolves the CFI and hands back a draw
+// callback; this is the only place a highlight is actually painted.
+let annotations = []
+
+view.addEventListener('draw-annotation', async (e) => {
+  const { draw, annotation } = e.detail
+  const { Overlayer } = await import('./foliate-js/overlayer.js')
+  // A note reads differently from a bare highlight, so it is coloured
+  // differently.
+  const color = annotation.hasBody ? '#f5a623' : '#ffd54a'
+  draw(Overlayer.highlight, { color })
+})
+
+window.omabookSetAnnotations = (json) => {
+  try { annotations = JSON.parse(json || '[]') } catch (e) { annotations = [] }
+  for (const a of annotations) {
+    view.addAnnotation({ value: a.cfi, hasBody: a.hasBody })
+      .catch(() => { /* section not rendered yet; create-overlay repaints */ })
+  }
+  return annotations.length
+}
+
+window.omabookAddAnnotation = (cfi, hasBody) => {
+  if (!cfi) return false
+  annotations.push({ cfi, hasBody })
+  view.addAnnotation({ value: cfi, hasBody }).catch(() => {})
+  return true
+}
+
+view.addEventListener('create-overlay', () => {
+  for (const a of annotations) {
+    view.addAnnotation({ value: a.cfi, hasBody: a.hasBody }).catch(() => {})
+  }
+})
+
+view.addEventListener('relocate', (e) => {
+  hideToolbar()
+  const d = e.detail || {}
+  const cfi = d.cfi || ''
+  const fraction = typeof d.fraction === 'number' ? d.fraction : 0
+  const label = d.tocItem?.label || ''
+  // Fixed-layout PDFs render to canvas and expose no text ranges, so the page
+  // number is what lets Rust extract the text with pdftotext instead. One
+  // section is one page there, so the section index is the page. The reading
+  // location is not: it is derived from section sizes (a PDF section counts
+  // 1000 against 1500 units per location), so it drifts further from the page
+  // the deeper into the book you are — page 69 asked pdftotext for page 45.
+  const page = view.isFixedLayout ? Number(d.section?.current ?? 0) + 1 : 0
+  if (bridge) bridge.pageChanged(cfi, fraction, visibleText(d), label, page)
+})
+
+// Everything Rust may call is defined BEFORE readerReady() fires. The
+// QWebChannel handshake completes after page load, so calling in earlier
+// evaluates against undefined and fails silently (docs/phase-0-spikes.md).
+window.omabookNext = () => { view.next(); return true }
+window.omabookPrev = () => { view.prev(); return true }
+window.omabookGoTo = (target) => { view.goTo(target); return true }
+
+// What is on screen right now. Reading aloud asks for this at the moment the
+// button is clicked, rather than trusting the text cached at the last
+// relocate, so it always starts at the top of the page in front of the reader.
+window.omabookPageText = () => visibleText(view.lastLocation)
+
+// Turn the page and hand back the new page's text. This is the primitive the
+// TTS autoplay loop is built on: it resolves only once the page has actually
+// moved, and to null at the end of the book.
+window.omabookAdvance = async (timeoutMs = 4000) => {
+  const before = view.lastLocation?.fraction ?? 0
+  const deadline = Date.now() + timeoutMs
+  try { await view.next() } catch (e) { return null }
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 100))
+    const now = view.lastLocation?.fraction ?? 0
+    if (now !== before) return visibleText(view.lastLocation)
+  }
+  return null
+}
+
+window.omabookSetAppearance = (opts) => {
+  // The chrome around the book has to move with it. `:root` above declares
+  // `color-scheme: light dark`, which follows the browser's own idea of the
+  // system, so an explicit choice in the app would otherwise leave the page
+  // dark around a light book.
+  document.documentElement.style.colorScheme = opts.dark ? 'dark' : 'light'
+
+  view?.renderer?.setStyles?.(`
+    html { color-scheme: ${opts.dark ? 'dark' : 'light'}; }
+    body { font-size: ${opts.fontSize || 100}%; line-height: 1.6; }
+  `)
+  return true
+}
+
+document.getElementById('next-zone').addEventListener('click', () => view.next())
+document.getElementById('prev-zone').addEventListener('click', () => view.prev())
+
+// foliate's pdf.js points the worker at its own vendored file. Repoint it at
+// the shim so the worker gets the polyfill too (see pdf-worker-shim.mjs).
+const preparePdf = async () => {
+  try {
+    await import('./foliate-js/pdf.js')
+    if (globalThis.pdfjsLib?.GlobalWorkerOptions) {
+      globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        new URL('./pdf-worker-shim.mjs', import.meta.url).toString()
+    }
+  } catch (e) {
+    console.warn('omabook: could not prepare pdf.js', e)
+  }
+}
+
+const openBook = async () => {
+  if (!bookUrl) { message('No book was given to open.'); return }
+  message('Opening…')
+  try {
+    const target = decodeURIComponent(bookUrl)
+    if (isPdf) await preparePdf()
+
+    // One page at a time, however wide the window is. A fixed-layout book
+    // pairs its pages into spreads unless the rendition says not to, and the
+    // renderer settles that when it opens the book — so the book is made
+    // here, and told, before it is handed over.
+    const book = await makeBook(target)
+    if (book.rendition?.layout === 'pre-paginated')
+      book.rendition.spread = 'none'
+    await view.open(book)
+
+    // The reflowable renderer decides the same thing by column count, which
+    // it recomputes on every resize: without this it splits into two columns
+    // as soon as the window is wide enough.
+    view.renderer?.setAttribute('flow', 'paginated')
+    view.renderer?.setAttribute('max-column-count', '1')
+
+    await view.init({ lastLocation: startCfi, showTextStart: !startCfi })
+    message('')
+    if (bridge) bridge.readerReady()
+  } catch (e) {
+    console.error('omabook: open failed', e)
+    message('Could not open this book.\n\n' + (e?.message || e))
+    if (bridge) bridge.readerFailed(String(e?.message || e))
+  }
+}
+
+if (window.qt?.webChannelTransport) {
+  new QWebChannel(qt.webChannelTransport, (channel) => {
+    bridge = channel.objects.reader
+    openBook()
+  })
+} else {
+  // Opened outside the app (a plain browser) — still usable for debugging.
+  openBook()
+}
+</script>
+</body>
+</html>

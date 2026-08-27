@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=OmaBooks
+GenericName=Book Library
+Comment=Read and organise your books
+Exec=omabook %f
+Icon=omabook
+Terminal=false
+Categories=Office;Viewer;Literature;
+MimeType=application/epub+zip;application/x-mobipocket-ebook;application/vnd.amazon.ebook;application/pdf;
+Keywords=book;ebook;epub;pdf;reader;library;
+StartupNotify=true
+StartupWMClass=omabook

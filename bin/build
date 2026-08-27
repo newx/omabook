@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+set -eu
+
+# Build omabook.
+#
+# Arch ships qmake as `qmake6`; other distributions ship it as `qmake`. Resolve
+# whichever exists rather than making every contributor discover that.
+#
+#   bin/build            release build
+#   bin/build --debug    debug build, faster to compile
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+BUILD_DIR="$ROOT/build"
+
+if command -v qmake6 >/dev/null 2>&1; then
+  QMAKE=qmake6
+elif command -v qmake >/dev/null 2>&1; then
+  QMAKE=qmake
+else
+  echo "qmake6 or qmake is required to build omabook (install qt6-base)." >&2
+  exit 1
+fi
+
+CONFIG_ARG="CONFIG+=release"
+if [ "${1:-}" = "--debug" ]; then
+  CONFIG_ARG="CONFIG+=debug"
+  BUILD_DIR="$ROOT/build-debug"
+fi
+
+JOBS="$(nproc 2>/dev/null || echo 1)"
+
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+"$QMAKE" "$ROOT/omabook.pro" "$CONFIG_ARG"
+make -j"$JOBS"
+
+echo "Built $BUILD_DIR/omabook"

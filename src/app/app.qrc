@@ -1,0 +1,28 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="AiPanel.qml">qml/AiPanel.qml</file>
+        <file alias="AnswerBox.qml">qml/AnswerBox.qml</file>
+        <file alias="AskView.qml">qml/AskView.qml</file>
+        <file alias="BookCard.qml">qml/BookCard.qml</file>
+        <file alias="BrandMark.qml">qml/BrandMark.qml</file>
+        <file alias="ConfirmDialog.qml">qml/ConfirmDialog.qml</file>
+        <file alias="FlatButton.qml">qml/FlatButton.qml</file>
+        <file alias="IconButton.qml">qml/IconButton.qml</file>
+        <file alias="Icons.qml">qml/Icons.qml</file>
+        <file alias="Main.qml">qml/Main.qml</file>
+        <file alias="NoteDialog.qml">qml/NoteDialog.qml</file>
+        <file alias="NotesView.qml">qml/NotesView.qml</file>
+        <file alias="QueueHelp.qml">qml/QueueHelp.qml</file>
+        <file alias="Reader.qml">qml/Reader.qml</file>
+        <file alias="SearchBox.qml">qml/SearchBox.qml</file>
+        <file alias="SettingsHeading.qml">qml/SettingsHeading.qml</file>
+        <file alias="SettingsRow.qml">qml/SettingsRow.qml</file>
+        <file alias="SettingsView.qml">qml/SettingsView.qml</file>
+        <file alias="Sidebar.qml">qml/Sidebar.qml</file>
+        <file alias="SidebarRow.qml">qml/SidebarRow.qml</file>
+        <file alias="SidebarSection.qml">qml/SidebarSection.qml</file>
+        <file alias="Theme.qml">qml/Theme.qml</file>
+        <file alias="VectorIcon.qml">qml/VectorIcon.qml</file>
+        <file alias="brand/mark.png">../../assets/omabook-mark.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+set -eu
+
+# Run the test suite.
+#
+# tests/tests.pro compiles src/core straight into the test binary, so the core
+# is tested without a running application. QT_QPA_PLATFORM=offscreen lets it run
+# with no display, which is what CI and a headless shell both need.
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+BUILD_DIR="$ROOT/build-tests"
+
+# The module list in tests.pro already makes `#include <QQmlEngine>` in core a
+# compile error. The fully-qualified form slips past it, because /usr/include/qt6
+# is always on the include path -- it would only fail at link, with a message
+# that does not name the file. Catch it here instead.
+if grep -rEn '#include *<Qt(Qml|Quick|WebEngine|WebChannel|Multimedia|Widgets)' \
+        "$ROOT/src/core" 2>/dev/null; then
+  echo "" >&2
+  echo "src/core must not reach for QML, Quick, WebEngine or Multimedia." >&2
+  echo "That code belongs in src/app. See CLAUDE.md, \"Layout\"." >&2
+  exit 1
+fi
+
+if command -v qmake6 >/dev/null 2>&1; then
+  QMAKE=qmake6
+else
+  QMAKE=qmake
+fi
+
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+"$QMAKE" "$ROOT/tests/tests.pro"
+make -j"$(nproc 2>/dev/null || echo 1)"
+QT_QPA_PLATFORM=offscreen ./tst_omabook "$@"
