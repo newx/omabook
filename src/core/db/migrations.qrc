@@ -5,5 +5,6 @@
         <file alias="003_search_and_notes.sql">migrations/003_search_and_notes.sql</file>
         <file alias="004_embeddings.sql">migrations/004_embeddings.sql</file>
         <file alias="005_chunk_search.sql">migrations/005_chunk_search.sql</file>
+        <file alias="006_drop_ai.sql">migrations/006_drop_ai.sql</file>
     </qresource>
 </RCC>

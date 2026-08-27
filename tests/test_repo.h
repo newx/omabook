@@ -266,15 +266,12 @@ private slots:
         QCOMPARE(countWhere(*db, QStringLiteral("reading_progress"), id), qint64(1));
         QCOMPARE(countWhere(*db, QStringLiteral("notes"), id), qint64(1));
         QCOMPARE(countWhere(*db, QStringLiteral("queue_items"), id), qint64(1));
-        QCOMPARE(countWhere(*db, QStringLiteral("book_chunks"), id), qint64(1));
-        QCOMPARE(countWhere(*db, QStringLiteral("chunk_embeddings"), id), qint64(1));
 
         QVERIFY(repo.deleteBook(id).isOk());
 
         QVERIFY(!repo.find(id).value().has_value());
         const QStringList tables = {
             QStringLiteral("reading_progress"), QStringLiteral("notes"), QStringLiteral("queue_items"),
-            QStringLiteral("book_chunks"), QStringLiteral("chunk_embeddings"),
         };
         for (const QString &table : tables)
             QCOMPARE(countWhere(*db, table, id), qint64(0));
@@ -582,34 +579,8 @@ private:
         note.quote = QStringLiteral("Call me Ishmael.");
         notes.upsert(note);
 
-        {
-            QSqlQuery chunk(db.connection());
-            chunk.prepare(
-                QStringLiteral("INSERT INTO book_chunks (book_id, ordinal, text) VALUES (:id, 0, 'a chunk')"));
-            chunk.bindValue(QStringLiteral(":id"), id);
-            chunk.exec();
-        }
-
-        qint64 chunkId = 0;
-        {
-            QSqlQuery query(db.connection());
-            query.prepare(QStringLiteral("SELECT id FROM book_chunks WHERE book_id = :id"));
-            query.bindValue(QStringLiteral(":id"), id);
-            query.exec();
-            if (query.next())
-                chunkId = query.value(0).toLongLong();
-        }
-
-        {
-            QSqlQuery embedding(db.connection());
-            embedding.prepare(QStringLiteral("INSERT INTO chunk_embeddings (chunk_id, book_id, model, dims, vector) "
-                                              "VALUES (:chunkId, :bookId, 'test-model', 3, :vector)"));
-            embedding.bindValue(QStringLiteral(":chunkId"), chunkId);
-            embedding.bindValue(QStringLiteral(":bookId"), id);
-            const QByteArray vector(12, '\0'); // 3 little-endian floats; the value is unused here
-            embedding.bindValue(QStringLiteral(":vector"), vector);
-            embedding.exec();
-        }
+        // Chunks and embeddings used to be seeded here too. Migration 006
+        // dropped those tables with the assistant.
 
         return id;
     }

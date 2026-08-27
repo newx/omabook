@@ -14,6 +14,7 @@ constexpr const char *kMigrations[] = {
     "003_search_and_notes",
     "004_embeddings",
     "005_chunk_search",
+    "006_drop_ai",
 };
 constexpr int kMigrationCount = sizeof(kMigrations) / sizeof(kMigrations[0]);
 
@@ -180,10 +181,14 @@ Result<void> migrate(QSqlDatabase &db) {
                 .arg(SCHEMA_VERSION));
     }
 
+    bool applied = false;
+
     for (int index = 0; index < kMigrationCount; ++index) {
         const qint64 version = index + 1;
         if (version <= current)
             continue;
+
+        applied = true;
 
         const QString name = QString::fromUtf8(kMigrations[index]);
         QFile file(QStringLiteral(":/migrations/%1.sql").arg(name));
@@ -226,6 +231,21 @@ Result<void> migrate(QSqlDatabase &db) {
         QSqlQuery commit(db);
         if (!commit.exec(QStringLiteral("COMMIT")))
             return Error::db(commit.lastError().text());
+    }
+
+    if (applied) {
+        // DROP TABLE only frees pages inside the file; it never shrinks it.
+        // Migration 006 removes the embeddings, and without this a library
+        // that had been indexed stays at its old size for ever -- 45 MB on
+        // this machine's, against 212 KB once the free pages are given back.
+        //
+        // Outside the transaction, because VACUUM cannot run inside one, and
+        // only when something was actually applied, so it costs nothing on
+        // the ordinary startup where there is no work to do.
+        QSqlQuery vacuum(db);
+        if (!vacuum.exec(QStringLiteral("VACUUM")))
+            qWarning("could not reclaim space after migrating: %s",
+                     qUtf8Printable(vacuum.lastError().text()));
     }
 
     return VoidResult::ok();
