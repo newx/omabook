@@ -6,8 +6,11 @@
 #include <QQmlContext>
 #include <QtWebEngineQuick>
 
+#include "bridge/aicontroller.h"
+#include "bridge/librarymodel.h"
 #include "bridge/notesmodel.h"
 #include "bridge/readerbridge.h"
+#include "bridge/sidebarmodel.h"
 #include "bridge/thememodel.h"
 #include "bridge/ttscontroller.h"
 
@@ -35,6 +38,9 @@ int main(int argc, char *argv[]) {
     // TtsController exist more than once with independent state (SPEC 5.13),
     // which a context property could not do.
     qmlRegisterType<ThemeModel>(QML_URI, 1, 0, "ThemeModel");
+    qmlRegisterType<LibraryModel>(QML_URI, 1, 0, "LibraryModel");
+    qmlRegisterType<AiController>(QML_URI, 1, 0, "AiController");
+    qmlRegisterType<SidebarModel>(QML_URI, 1, 0, "SidebarModel");
     qmlRegisterType<NotesModel>(QML_URI, 1, 0, "NotesModel");
     qmlRegisterType<ReaderBridge>(QML_URI, 1, 0, "ReaderBridge");
     qmlRegisterType<TtsController>(QML_URI, 1, 0, "TtsController");

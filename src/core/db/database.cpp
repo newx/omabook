@@ -4,6 +4,7 @@
 
 #include <QAtomicInteger>
 #include <QDebug>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -139,12 +140,33 @@ Database::~Database() {
     QSqlDatabase::removeDatabase(connectionName);
 }
 
-Database &Database::forCurrentThread(const QString &path) {
+namespace {
+
+// The per-thread connection, reachable from the post routine below as well as
+// from forCurrentThread().
+std::unique_ptr<Database> &threadInstance() {
     thread_local std::unique_ptr<Database> instance;
+    return instance;
+}
+
+} // namespace
+
+Database &Database::forCurrentThread(const QString &path) {
+    std::unique_ptr<Database> &instance = threadInstance();
     if (!instance) {
         const QString connectionName = QStringLiteral("omabook_%1")
                                             .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
         instance.reset(new Database(path, connectionName));
+
+        // A thread_local is destroyed when its thread exits, and for the main
+        // thread that is after ~QCoreApplication has already run. QSqlDatabase
+        // then warns "requires a QCoreApplication" and leaks the handle rather
+        // than closing it. qAddPostRoutine fires while the application is still
+        // alive, which is the last moment the connection can be closed
+        // properly. Worker threads are unaffected: theirs go when they do.
+        const QCoreApplication *app = QCoreApplication::instance();
+        if (app && QThread::currentThread() == app->thread())
+            qAddPostRoutine([] { threadInstance().reset(); });
     }
     return *instance;
 }

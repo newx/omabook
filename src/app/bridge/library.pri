@@ -1,4 +1,9 @@
-# Filled in as this bridge is ported. See TODO.md.
+HEADERS += \
+    $$PWD/importworker.h \
+    $$PWD/librarymodel.h \
+    $$PWD/sidebarmodel.h
 
-HEADERS +=
-SOURCES +=
+SOURCES += \
+    $$PWD/importworker.cpp \
+    $$PWD/librarymodel.cpp \
+    $$PWD/sidebarmodel.cpp

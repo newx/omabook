@@ -9,6 +9,15 @@ if ! command -v makepkg >/dev/null 2>&1; then
   exit 1
 fi
 
+# The reader engine is not vendored and is gitignored, because it is a separate
+# project with its own history. Without it omabook builds and the library works,
+# but opening a book renders nothing at all.
+if [ ! -f "$ROOT/assets/reader/foliate-js/view.js" ]; then
+  echo "Fetching the reader engine (foliate-js)..."
+  git clone --depth 1 https://github.com/johnfactotum/foliate-js.git \
+    "$ROOT/assets/reader/foliate-js"
+fi
+
 "$ROOT/bin/build"
 
 cd "$PKGBUILD_DIR"

@@ -588,9 +588,13 @@ The QML moves across nearly intact. The edits:
   keeps exactly `A-Za-z0-9-_.~` literal and hex-encodes every other byte, which
   is byte-for-byte what the Rust helper did, UTF-8 paths included. Verified,
   not assumed.
-- **Argument parsing moves into `main()`.** The Rust build read
-  `Qt.application.arguments` from QML because it had no argument handling of its
-  own; C++ has `QCoreApplication::arguments()` and should use it.
+- **Argument handling stays in QML, and that turns out to be correct.**
+  `Qt.application.arguments` reads the same list in a C++ application as in the
+  Rust one, so `--show`, `--open` and the whole probe harness port with no
+  change at all. What is genuinely missing — in the Rust build too — is a
+  handler for a *bare file path*: the `.desktop` carries `Exec=omabook %f`, and
+  nothing reads it, so double-clicking a book opens the library rather than the
+  book. That belongs in `main()`, and it is listed in TODO.md.
 - **Property names stay `snake_case`; invokables stay `camelCase`.** cxx-qt
   never camelCased a `#[qproperty]`, while every invokable carried an explicit
   `#[cxx_name]`, so the QML reads `bridgeObject.last_cfi` and

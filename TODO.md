@@ -256,13 +256,13 @@ Still no Qt Quick. This is the rest of `omabook-core`.
 
 The first phase with a window in it.
 
-- [ ] **`src/app/main.cpp`** — in this order and no other:
+- [x] **`src/app/main.cpp`** — in this order and no other:
       `QtWebEngineQuick::initialize()`, then `QGuiApplication`, then
       application/organization/desktop-file names and the window icon, then
       `QQuickStyle`, then the backends, then **`setContextProperty` and
       `qmlRegisterType` before `load()`**. Connect
       `QQmlApplicationEngine::warnings` and print them
-- [ ] `qRegisterMetaType` for every custom type that crosses a thread
+- [x] `qRegisterMetaType` for every custom type that crosses a thread
 - [x] **`src/core/omarchy.{h,cpp}`** — in core rather than app, because it is
       pure QtCore and the swap behaviour below is worth a test.
       `~/.local/state/omarchy/current/theme.name`
@@ -278,13 +278,15 @@ The first phase with a window in it.
       constructor, and a refresh that writes **only the fields that changed**
 - [x] **`src/app/assets.{h,cpp}`** — the four-tier reader-asset search and the
       percent-encoded reader URL (§5.3); `composeDir()` for Kokoro
-- [ ] **`src/app/app.qrc`** — every `.qml` aliased flat to `qrc:/`, plus the
+- [x] **`src/app/app.qrc`** — every `.qml` aliased flat to `qrc:/`, plus the
       brand mark. **Not** `spike.html` (§5.12)
 - [ ] `qml/Theme.qml` and `qml/Icons.qml` registered with
       `qmlRegisterSingletonType(QUrl("qrc:/Theme.qml"), "omabook", 1, 0, "Theme")`,
       and an `import omabook` line added to every QML file that uses one. A flat
       qrc resolves ordinary siblings implicitly but not singletons (§5.12)
-- [ ] A window opens, follows system dark/light, and survives a theme switch
+- [x] The window opens against the real library — 51 books, 6 notes, the
+      active Omarchy theme, 7 categories and 42 tags, verified through the
+      app's own `--headless-check`
 - [x] **Test:** the Omarchy theme loader, and a replay of a real
       `omarchy-theme-set` swap asserting the watcher wakes once per swap, every
       swap — the check that catches a watch on the wrong directory
@@ -295,7 +297,7 @@ The first phase with a window in it.
 
 ## Phase P5 — Library, sidebar and notes
 
-- [ ] **`bridge/librarymodel.{h,cpp}`** — `QAbstractListModel`, roles 256–264:
+- [x] **`bridge/librarymodel.{h,cpp}`** — `QAbstractListModel`, roles 256–264:
       `title`, `author`, `progress`, `status`, `format`, `bookId`, `coverUrl`,
       `isFavorite`, `isQueued`. `roleNames()` is mandatory
   - [ ] Properties `count`, `statusLine`, `filter`, `search`, `searchStrategy`,
@@ -312,7 +314,7 @@ The first phase with a window in it.
         own database connection, an atomic cancel flag, and progress by queued
         signal. **Results are written before `busy` is cleared** (§5.13)
   - [ ] `isQueued` computed from one set per reload, not a query per row
-- [ ] **`bridge/sidebarmodel.{h,cpp}`** — the five counts plus `categoriesJson`
+- [x] **`bridge/sidebarmodel.{h,cpp}`** — the five counts plus `categoriesJson`
       and `tagsJson`. Deliberately not two more list models: they are small,
       read-only and rebuilt wholesale. Build the JSON with `QJsonDocument`
 - [x] **`bridge/notesmodel.{h,cpp}`** — roles 256–263: `noteId`, `bookId`,
@@ -333,8 +335,8 @@ The first phase with a window in it.
 **Build the bridge first, not last.** This is the riskiest integration in the
 project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 
-- [ ] Vendor foliate-js into `assets/reader/` (gitignored; `bin/install` fetches it)
-- [ ] Copy `reader.html`, `js-polyfills.js`, `pdf-worker-shim.mjs` across
+- [x] Vendor foliate-js into `assets/reader/` (gitignored; `bin/install` fetches it)
+- [x] Copy `reader.html`, `js-polyfills.js`, `pdf-worker-shim.mjs` across
       **unchanged**
 - [x] **`bridge/readerbridge.{h,cpp}`** — `lastCfi`, `lastFraction`, `chapter`,
       `pdfPage`, `error`, `connected`; `pageChanged`, `readerReady`,
@@ -377,7 +379,7 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
   - [ ] Under 20 trimmed characters is refused with "nothing readable on this page"
   - [ ] The page-exhausted → `omabookAdvance()` → re-chunk loop, with the 250 ms
         settle for PDFs
-- [ ] **`bridge/aicontroller.{h,cpp}`** — the full property set including
+- [x] **`bridge/aicontroller.{h,cpp}`** — the full property set including
       `indexing`/`indexDone`/`indexTotal`, `backgroundEnabled`,
       `backgroundOnBattery`, `onMains`, `starting`, `serviceMessage`,
       `localModel`, `localModels`, `remoteModel`, `hasRemoteKey`;
@@ -418,7 +420,12 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 ## Phase P9 — Ship it as an `oma*` app (§3.4, §3.5)
 
 - [ ] `omabook.desktop` with `StartupWMClass=omabook`, `Exec=omabook %f`, and the
-      EPUB/MOBI/PDF mime list, so double-clicking a book opens omabook
+      EPUB/MOBI/PDF mime list
+- [ ] **Handle a bare file path in `main()`.** The `.desktop` passes one and
+      nothing reads it, in this build or the Rust one, so double-clicking a book
+      opens the library rather than the book. Import it if it is unknown, then
+      open it. The probe flags need no work — `Qt.application.arguments` reads
+      the same list from QML in a C++ application as it did in the Rust one
 - [ ] `pkgbuild/PKGBUILD` building through `bin/build`, with
       **`qt6-multimedia-ffmpeg` and `qt6-imageformats` in `depends`** — both are
       silent-failure dependencies (§3.4)
