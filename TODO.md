@@ -421,7 +421,15 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
       fails to load, so neither speech path can be exercised here. The app
       degrades as it should meanwhile — the reader opens and reads fine with no
       speech at all
-- [ ] `--probe-import` and `--probe-ai`
+- [x] `--probe-import` — three books into a scratch library: categories from
+      their folders, Devanagari titles intact, `text_quality` assessed (the PDF
+      scored `poor`), subject tags extracted, covers thumbnailed. **31
+      event-loop ticks during the import**, so it genuinely runs off the UI
+      thread; the Rust build ticks 7 on the same corpus
+- [x] Covers are thumbnailed as intended: 320x410, 320x414, 320x425 against the
+      Rust build's 398x510, 680x880 and 564x750 originals — aspect preserved,
+      all re-encoded to JPEG, 392 KB down to 110 KB
+- [ ] `--probe-ai`
 - [ ] **Run the probes against a scratch `HOME`.** They write to the real
       library — the queue probe reorders your actual reading queue — and a
       probe combined with `--open` measures a screen the reader is covering
