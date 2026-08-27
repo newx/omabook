@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import com.omabook.app
 
 // The reading queue's own header.
 //

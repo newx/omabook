@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import com.omabook.app
 
 // A sidebar group: MAIN, CATEGORIES, TAGS. MAIN is not collapsible; the
 // taxonomy groups are, because they can grow without bound.

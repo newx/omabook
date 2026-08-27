@@ -12,7 +12,11 @@
 // Rust crate's `Error` enum (omabook-core/src/error.rs). `message` is
 // user-facing and written as a sentence, so it can be shown as-is.
 struct Error {
-    enum class Kind { Io, Zip, Xml, Db, Net, Convert, Cancelled };
+    // Decode is a stored value that is no longer meaningful -- an unknown
+    // status string, a vector blob of the wrong length. Convert is an
+    // external converter (ebook-convert) that failed. They read alike and
+    // are not: the first means the database disagrees with this build.
+    enum class Kind { Io, Zip, Xml, Db, Net, Decode, Convert, Cancelled };
 
     Kind kind = Kind::Io;
     QString message;
@@ -22,6 +26,7 @@ struct Error {
     static Error xml(const QString &message) { return Error{Kind::Xml, message}; }
     static Error db(const QString &message) { return Error{Kind::Db, message}; }
     static Error net(const QString &message) { return Error{Kind::Net, message}; }
+    static Error decode(const QString &message) { return Error{Kind::Decode, message}; }
     static Error convert(const QString &message) { return Error{Kind::Convert, message}; }
     static Error cancelled(const QString &message) { return Error{Kind::Cancelled, message}; }
 };
@@ -62,6 +67,10 @@ public:
     static Result ok() { return Result(); }
     static Result err(Error error) { return Result(std::move(error)); }
 
+    // Implicit, to match Result<T>: it is what lets a bare `return
+    // result.error();` inside a Result<void>-returning function work.
+    Result(Error error) : m_error(std::move(error)) { }
+
     bool isOk() const { return !m_error.has_value(); }
     bool isErr() const { return !isOk(); }
 
@@ -69,7 +78,6 @@ public:
 
 private:
     Result() = default;
-    explicit Result(Error error) : m_error(std::move(error)) { }
 
     std::optional<Error> m_error;
 };
@@ -77,11 +85,13 @@ private:
 using VoidResult = Result<void>;
 
 // Propagates a Result<E>-returning expression out of the current function.
-// `expr` must be an lvalue-able Result; the enclosing function must itself
-// return a Result whose error type matches. Named after Rust's `?` operator.
+// Relies on Result<T>'s implicit Error constructor, so the enclosing
+// function may return any Result<T> -- not just the same T as `expr` --
+// same as Rust's `?` operator threading one error type through functions
+// with different Ok types.
 #define RETURN_IF_ERR(expr)                                                                     \
     do {                                                                                        \
         auto _result = (expr);                                                                  \
         if (_result.isErr())                                                                    \
-            return decltype(_result)::err(_result.error());                                     \
+            return _result.error();                                                             \
     } while (0)

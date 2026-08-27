@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import com.omabook.app
 
 // A borderless icon button, for card footers and toolbars. Takes either a
 // vector path (preferred) or a text glyph.

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import com.omabook.app
 
 // One icon, stroked when inactive and filled when active.
 Item {

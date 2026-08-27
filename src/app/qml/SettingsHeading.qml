@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import com.omabook.app
 
 // A group title on the settings page, in the sidebar's idiom.
 Item {

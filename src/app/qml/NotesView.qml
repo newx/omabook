@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import com.omabook.app
 
 // Every highlight and note across the library, newest first.
 Item {

@@ -1,4 +1,5 @@
 import QtQuick
+import com.omabook.app
 
 // The wordmark: the Omarchy book glyph, then "OmaBooks" beside it.
 //

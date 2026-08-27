@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import com.omabook.app
 
 // One clickable line in the sidebar.
 Item {

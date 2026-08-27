@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import com.omabook.app
 
 // Search box above the sidebar's MAIN section.
 //

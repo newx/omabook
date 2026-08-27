@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import com.omabook.app
 
 // One setting: a label on the left, its controls on the right, and an optional
 // line underneath saying what the choice actually does.

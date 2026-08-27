@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import com.omabook.app
 
 // A button with a border and no fill, gradient, or shadow.
 Item {

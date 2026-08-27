@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import com.omabook.app
 
 // Where an answer from the model lands.
 //

@@ -1,0 +1,263 @@
+#pragma once
+
+#include <QtTest>
+
+#include <QFileInfo>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QStandardPaths>
+#include <QDir>
+#include <QSignalSpy>
+#include <QTemporaryDir>
+
+#include "core/db/database.h"
+#include "core/db/migrations.h"
+#include "core/models/book.h"
+#include "core/omarchy.h"
+#include "core/result.h"
+
+class CoreTest : public QObject {
+    Q_OBJECT
+
+private slots:
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+
+    // --- db/migrations -----------------------------------------------
+
+    void opensAndMigratesInMemory() {
+        auto db = Database::openForTest();
+        QSqlQuery query(db->connection());
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toLongLong(), SCHEMA_VERSION);
+    }
+
+    void migratingTwiceIsANoOp() {
+        // openForTest() already migrated once on open; migrating again
+        // explicitly must be a no-op, not a re-application or an error.
+        auto db = Database::openForTest();
+        const VoidResult second = migrate(db->connection());
+        QVERIFY(second.isOk());
+
+        QSqlQuery query(db->connection());
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toLongLong(), SCHEMA_VERSION);
+    }
+
+    void refusesToDowngrade() {
+        auto db = Database::openForTest();
+        QSqlQuery bump(db->connection());
+        QVERIFY(bump.exec(QStringLiteral("PRAGMA user_version = %1").arg(SCHEMA_VERSION + 5)));
+
+        const VoidResult result = migrate(db->connection());
+        QVERIFY(result.isErr());
+    }
+
+    void foreignKeysAreEnforced() {
+        auto db = Database::openForTest();
+        QSqlQuery query(db->connection());
+        QVERIFY(!query.exec(QStringLiteral("INSERT INTO book_tags (book_id, tag_id) VALUES (1, 1)")));
+    }
+
+    void splitsStatementsWithoutBreakingTriggers() {
+        const QString sql = QStringLiteral(
+            "CREATE TABLE t (id INTEGER);\n"
+            "CREATE TRIGGER trg AFTER UPDATE ON t BEGIN\n"
+            "  INSERT INTO t (id) VALUES (1);\n"
+            "  INSERT INTO t (id) VALUES (2);\n"
+            "END;\n"
+            "CREATE TABLE u (id INTEGER);\n");
+
+        const QStringList statements = splitStatements(sql);
+        QCOMPARE(statements.size(), 3);
+        QVERIFY(statements.at(1).contains(QStringLiteral("BEGIN")));
+        QVERIFY(statements.at(1).contains(QStringLiteral("END")));
+        // Both INSERTs stayed inside the trigger's single statement rather
+        // than each becoming its own.
+        QCOMPARE(statements.at(1).count(QStringLiteral("INSERT")), 2);
+    }
+
+    // --- db/database ---------------------------------------------------
+
+    void vacuumIntoWritesAReadableSnapshot() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+
+        const QString sourcePath = dir.filePath(QStringLiteral("source.db"));
+        auto source = Database::openForTest(sourcePath);
+
+        QSqlQuery insert(source->connection());
+        QVERIFY(insert.exec(QStringLiteral(
+            "INSERT INTO categories (name, slug) VALUES ('Fiction', 'fiction')")));
+
+        const QString snapshotPath = dir.filePath(QStringLiteral("snapshot.db"));
+        const VoidResult vacuumed = source->vacuumInto(snapshotPath);
+        QVERIFY(vacuumed.isOk());
+        QVERIFY(QFileInfo::exists(snapshotPath));
+
+        auto snapshot = Database::openForTest(snapshotPath);
+        QSqlQuery check(snapshot->connection());
+        QVERIFY(check.exec(QStringLiteral("SELECT slug FROM categories WHERE slug = 'fiction'")));
+        QVERIFY(check.next());
+        QCOMPARE(check.value(0).toString(), QStringLiteral("fiction"));
+    }
+
+    // --- models/book -----------------------------------------------------
+
+    void formatsRoundTripThroughStrings() {
+        const BookFormat formats[] = {
+            BookFormat::Epub, BookFormat::Pdf, BookFormat::Mobi, BookFormat::Azw3, BookFormat::Cbz,
+        };
+        for (BookFormat format : formats) {
+            const Result<BookFormat> parsed = fromString<BookFormat>(toString(format));
+            QVERIFY(parsed.isOk());
+            QCOMPARE(parsed.value(), format);
+        }
+    }
+
+    void onlyTheMobiFamilyNeedsAConverter() {
+        QVERIFY(needsConversion(BookFormat::Mobi));
+        QVERIFY(needsConversion(BookFormat::Azw3));
+        QVERIFY(!needsConversion(BookFormat::Epub));
+        QVERIFY(!needsConversion(BookFormat::Pdf));
+    }
+
+    void extensionsAreCaseInsensitiveAndDotTolerant() {
+        const std::optional<BookFormat> epub = bookFormatFromExtension(QStringLiteral(".EPUB"));
+        QVERIFY(epub.has_value());
+        QCOMPARE(*epub, BookFormat::Epub);
+
+        const std::optional<BookFormat> pdf = bookFormatFromExtension(QStringLiteral("pdf"));
+        QVERIFY(pdf.has_value());
+        QCOMPARE(*pdf, BookFormat::Pdf);
+
+        QVERIFY(!bookFormatFromExtension(QStringLiteral("txt")).has_value());
+    }
+
+    void readablePathPrefersTheConvertedFile() {
+        Book book;
+        book.sourcePath = QStringLiteral("/books/a.mobi");
+        book.format = BookFormat::Mobi;
+        QCOMPARE(book.readablePath(), QStringLiteral("/books/a.mobi"));
+
+        book.readingPath = QStringLiteral("/books/a.epub");
+        QCOMPARE(book.readablePath(), QStringLiteral("/books/a.epub"));
+    }
+
+    void unknownStatusIsRejectedRatherThanDefaulted() {
+        QVERIFY(fromString<BookStatus>(QStringLiteral("halfway")).isErr());
+    }
+
+    void authorsSurviveTheRoundTrip() {
+        const QStringList authors = {
+            QStringLiteral("Herman Melville"),
+            QStringLiteral("Nathaniel Hawthorne"),
+        };
+        const QString json = Book::encodeAuthors(authors);
+        QCOMPARE(Book::decodeAuthors(json), authors);
+
+        Book book;
+        QCOMPARE(book.authorLine(), QStringLiteral("Unknown author"));
+        book.authors = authors;
+        QCOMPARE(book.authorLine(), QStringLiteral("Herman Melville, Nathaniel Hawthorne"));
+    }
+
+    // --- omarchy ----------------------------------------------------
+
+    void parsesTheSolitudePalette() {
+        const auto values = Omarchy::parseSimpleToml(QStringLiteral(
+            "\nmode = \"dark\"\n\naccent = \"#798186\"\n"
+            "# a comment\nbackground = \"#101315\"\nforeground = \"#cacccc\"\n"));
+        QCOMPARE(values.value(QStringLiteral("mode")), QStringLiteral("dark"));
+        QCOMPARE(values.value(QStringLiteral("accent")), QStringLiteral("#798186"));
+        QCOMPARE(values.value(QStringLiteral("foreground")), QStringLiteral("#cacccc"));
+        QVERIFY(!values.contains(QStringLiteral("# a comment")));
+    }
+
+    void ignoresSectionHeadersAndJunk() {
+        const auto values = Omarchy::parseSimpleToml(
+            QStringLiteral("[section]\nnot a pair\nkey = \"v\"\nempty =\n"));
+        QCOMPARE(values.size(), 1);
+        QCOMPARE(values.value(QStringLiteral("key")), QStringLiteral("v"));
+    }
+
+    void readsTheCurrentOmarchyTheme() {
+        QTemporaryDir home;
+        QVERIFY(home.isValid());
+        const QString state = home.filePath(QStringLiteral("current"));
+        QVERIFY(QDir().mkpath(state + QStringLiteral("/theme")));
+
+        QFile colors(state + QStringLiteral("/theme/colors.toml"));
+        QVERIFY(colors.open(QIODevice::WriteOnly | QIODevice::Text));
+        colors.write("mode = \"light\"\naccent = \"#112233\"\nforeground = \"#101010\"\n");
+        colors.close();
+
+        QFile name(state + QStringLiteral("/theme.name"));
+        QVERIFY(name.open(QIODevice::WriteOnly | QIODevice::Text));
+        name.write("catppuccin\n");
+        name.close();
+
+        const OmarchyTheme theme = Omarchy::readFrom(state);
+        QCOMPARE(theme.name, QStringLiteral("catppuccin"));
+        QVERIFY(!theme.dark);
+        QCOMPARE(theme.accent, QStringLiteral("#112233"));
+        QCOMPARE(theme.foreground, QStringLiteral("#101010"));
+        // Absent from the file, so the built-in default stands.
+        QCOMPARE(theme.muted, QStringLiteral("#4b4e55"));
+    }
+
+    void aDesktopWithoutOmarchyStillYieldsUsableColours() {
+        QTemporaryDir empty;
+        QVERIFY(empty.isValid());
+        const OmarchyTheme theme = Omarchy::readFrom(empty.filePath(QStringLiteral("nothing")));
+        QVERIFY(theme.accent.startsWith(QLatin1Char('#')));
+        QVERIFY(theme.dark);
+        QCOMPARE(theme.name, QStringLiteral("unknown"));
+    }
+
+    void aDesktopWithoutOmarchyIsNotAnError() {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        OmarchyWatcher watcher;
+        QVERIFY(!watcher.watch(root.filePath(QStringLiteral("absent"))));
+    }
+
+    // Replays what `omarchy-theme-set` actually does -- delete the theme
+    // directory, move a new one into its place, then write theme.name -- and
+    // checks the watcher survives it and reports it once. A watch on
+    // current/theme rather than current/ passes this on the first round and
+    // then goes silent forever, which is the bug this test exists to catch.
+    void aThemeSwapWakesTheWatcherEveryTime() {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const QString current = root.filePath(QStringLiteral("current"));
+        QVERIFY(QDir().mkpath(current + QStringLiteral("/theme")));
+
+        OmarchyWatcher watcher;
+        QVERIFY(watcher.watch(current));
+        QSignalSpy changes(&watcher, &OmarchyWatcher::themeChanged);
+
+        for (int round = 0; round < 3; ++round) {
+            const QString next = root.filePath(QStringLiteral("next"));
+            QVERIFY(QDir().mkpath(next));
+            QFile colors(next + QStringLiteral("/colors.toml"));
+            QVERIFY(colors.open(QIODevice::WriteOnly | QIODevice::Text));
+            colors.write(QStringLiteral("accent = \"#%1%1%1\"").arg(round).toUtf8());
+            colors.close();
+
+            QVERIFY(QDir(current + QStringLiteral("/theme")).removeRecursively());
+            QVERIFY(QDir().rename(next, current + QStringLiteral("/theme")));
+            QFile name(current + QStringLiteral("/theme.name"));
+            QVERIFY(name.open(QIODevice::WriteOnly | QIODevice::Text));
+            name.write(QStringLiteral("theme-%1").arg(round).toUtf8());
+            name.close();
+
+            QVERIFY2(changes.wait(5000), qPrintable(QStringLiteral("no notification for swap %1").arg(round)));
+            // The burst is coalesced, so the whole swap is one wake-up, not
+            // one per file touched.
+            QCOMPARE(changes.count(), 1);
+            changes.clear();
+        }
+    }
+};

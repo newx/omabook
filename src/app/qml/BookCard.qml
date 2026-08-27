@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
+import com.omabook.app
 
 // One book in the grid: a cover filling the card's width, then title, author,
 // and a footer of actions.

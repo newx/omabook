@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import com.omabook.app
 
 // Writing a note about a selected passage. Native rather than in the page, so
 // it matches the rest of the app.

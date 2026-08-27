@@ -38,9 +38,10 @@ Read it before starting any phase.
       QtCore in Qt 6 (§7.6)
 - [x] **The core/app boundary is compiler-enforced.** A `.pro` that omits `qml`
       from `QT` makes `#include <QQmlEngine>` a compile error
-- [ ] `omabook.pro`, `src/core/core.pri`, `src/app/app.pri`, `tests/tests.pro` —
-      the four build files, with empty file lists, building an empty window
-- [ ] `bin/test` greps for the fully-qualified `#include <QtQml/...>` form that
+- [x] `omabook.pro` plus a `.pri` per subsystem, and `tests/tests.pro`. One
+      test binary with one class per subsystem, since a single `tst_omabook.cpp`
+      would be the file everybody edits
+- [x] `bin/test` greps for the fully-qualified `#include <QtQml/...>` form that
       would slip past the module-list guard
 
 ---
@@ -50,9 +51,10 @@ Read it before starting any phase.
 Nothing in this phase touches Qt Quick. It is the layer everything else sits on,
 and it is the cheapest place to be wrong.
 
-- [ ] **`src/core/result.h`** (§8) — `Error{Kind, message}` with
-      `Io|Zip|Xml|Db|Net|Convert|Cancelled`, and `Result<T>`. No exceptions
-- [ ] **`src/core/db/database.{h,cpp}`** ← `db/mod.rs`
+- [x] **`src/core/result.h`** (§8) — `Error{Kind, message}` with
+      `Io|Zip|Xml|Db|Net|Decode|Convert|Cancelled`, `Result<T>`, `Result<void>`
+      and `RETURN_IF_ERR`. No exceptions
+- [x] **`src/core/db/database.{h,cpp}`** ← `db/mod.rs`
   - [ ] `Database::forCurrentThread()` — named per-thread connections, the only
         sanctioned way to reach SQLite. Never store a `QSqlDatabase` in a member
   - [ ] `setConnectOptions("QSQLITE_BUSY_TIMEOUT=5000")` before `open()`, then
@@ -61,13 +63,13 @@ and it is the cheapest place to be wrong.
         `~/.config`, `~/.cache` fallbacks
   - [ ] chmod 0600 on the db file and its `-wal` / `-shm` siblings
   - [ ] `vacuumInto(path)` — removes an existing target first (§5.11)
-- [ ] **`src/core/db/migrations.{h,cpp}`** ← `db/migrations.rs`
+- [x] **`src/core/db/migrations.{h,cpp}`** ← `db/migrations.rs`
   - [ ] The five `.sql` files copied **byte-for-byte** into
         `src/core/db/migrations/` and compiled in through the resource system
   - [ ] Runner keyed on `PRAGMA user_version`, one transaction per migration,
         refusing to run against a database from a newer schema
   - [ ] **Append-only.** Never edit a shipped migration
-- [ ] **`src/core/models/`** ← `models/book.rs`
+- [x] **`src/core/models/`** ← `models/book.rs`
   - [ ] `Book`, `NewBook`; `BookStatus`, `TextQuality`, `BookFormat` as
         `Q_ENUM`s with the same lowercase string encodings, `fromString`
         returning an error rather than defaulting on an unknown value
@@ -93,7 +95,7 @@ and it is the cheapest place to be wrong.
 - [ ] **`src/core/repo/taxonomy.{h,cpp}`** ← `repo/taxonomy.rs` — `slugify`,
       `ensure` (find-or-create by slug), `attach`, `listWithCounts`
 - [ ] **`src/core/repo/settingsrepository.{h,cpp}`** ← `repo/settings.rs`
-- [ ] **Tests** (~30): schema version after migrate and after migrating twice;
+- [~] **Tests** (14 of ~30 written — db, migrations, models): schema version after migrate and after migrating twice;
       downgrade refused; foreign keys enforced; idempotent insert; authors round
       trip; case-insensitive title sort; first progress moves to reading;
       threshold finishes; fraction clamped; `vacuum_into` snapshot reopens;
@@ -258,13 +260,15 @@ The first phase with a window in it.
       `qmlRegisterType` before `load()`**. Connect
       `QQmlApplicationEngine::warnings` and print them
 - [ ] `qRegisterMetaType` for every custom type that crosses a thread
-- [ ] **`src/app/omarchy.{h,cpp}`** — `~/.local/state/omarchy/current/theme.name`
+- [x] **`src/core/omarchy.{h,cpp}`** — in core rather than app, because it is
+      pure QtCore and the swap behaviour below is worth a test.
+      `~/.local/state/omarchy/current/theme.name`
       and `theme/colors.toml`, a permissive line-based parser reading `mode`,
       `accent`, `foreground`, `muted`, and a fallback theme so the app works on a
       non-Omarchy desktop
-  - [ ] **Watch `current/`, not `current/theme/`** — `omarchy-theme-set` deletes
+  - [x] **Watch `current/`, not `current/theme/`** — `omarchy-theme-set` deletes
         and renames the child, and a watch on it follows the dead inode (§5.13)
-  - [ ] A 150 ms settle window coalescing the burst one theme change produces
+  - [x] A 150 ms settle window coalescing the burst one theme change produces
 - [ ] **`src/app/bridge/thememodel.{h,cpp}`** — `mode`/`dark`/`accent`/`themeName`,
       `cycleMode`, **`applyMode` (not `setMode` — the property's notifier owns
       that name)**, `followSystemTheme` started from QML rather than the
@@ -278,8 +282,9 @@ The first phase with a window in it.
       and an `import omabook` line added to every QML file that uses one. A flat
       qrc resolves ordinary siblings implicitly but not singletons (§5.12)
 - [ ] A window opens, follows system dark/light, and survives a theme switch
-- [ ] **Test:** the Omarchy theme loader against a faked `HOME`
-      (`QTemporaryDir` + an RAII restorer, as omawrite's does)
+- [x] **Test:** the Omarchy theme loader, and a replay of a real
+      `omarchy-theme-set` swap asserting the watcher wakes once per swap, every
+      swap — the check that catches a watch on the wrong directory
 - [ ] **Test:** walk `:/` with `QDirIterator` and `QQmlComponent::create()` every
       `.qml` — catches a file missing from `app.qrc`, which is otherwise silent
 

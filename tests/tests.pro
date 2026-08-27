@@ -15,5 +15,15 @@ INCLUDEPATH += $$PWD/../src
 
 include(../src/core/core.pri)
 
-SOURCES += tst_omabook.cpp
+# One header per subsystem; moc picks each up from HEADERS.
+HEADERS += \
+    $$PWD/test_core.h \
+    $$PWD/test_repo.h \
+    $$PWD/test_import.h \
+    $$PWD/test_parsers.h \
+    $$PWD/test_ai.h \
+    $$PWD/test_tts.h
+
+SOURCES += $$PWD/tst_omabook.cpp
+
 RESOURCES += ../src/core/db/migrations.qrc

@@ -143,10 +143,11 @@ omabook-cplus/
 │   │   ├── ai/              # vectors, policy, power, indexer, prompts,
 │   │   │                    #   ollama, anthropic, assistant
 │   │   ├── tts/             # chunker, kokoro
+│   │   ├── omarchy.{h,cpp}   # the active Omarchy theme, and watching it
 │   │   └── services.cpp     # start ollama / kokoro
 │   └── app/
 │       ├── app.pri  app.qrc
-│       ├── main.cpp  assets.cpp  omarchy.cpp
+│       ├── main.cpp  assets.cpp
 │       ├── bridge/          # LibraryModel, ReaderBridge, SidebarModel,
 │       │                    #   NotesModel, TtsController, AiController,
 │       │                    #   ThemeModel
@@ -611,6 +612,10 @@ Recorded because each is deliberate and none is self-evident:
   overload is ambiguous to `moc`. The same reason renames the setters
   `applyMode`, `changeSpeed` and `changeVoice`. This constraint is identical in
   C++ and must be honoured identically.
+- **The Omarchy theme reader moves from the app to the core.** It is pure
+  QtCore, and in core it is reachable by the test binary — which matters,
+  because the watcher's behaviour across a real theme swap is exactly the thing
+  worth a regression test.
 - **The Omarchy theme watcher watches the *parent* directory.**
   `omarchy-theme-set` deletes `current/theme/` and renames a new one into place,
   so a watch on `theme/` follows the deleted inode into the void and never fires
@@ -744,7 +749,9 @@ dependency this project would accept.
 ## 8. Errors
 
 `src/core/result.h` holds a small `Result<T>` and an `Error` with a `Kind`
-enum — `Io`, `Zip`, `Xml`, `Db`, `Net`, `Convert`, `Cancelled`. Core functions
+enum — `Io`, `Zip`, `Xml`, `Db`, `Net`, `Decode`, `Convert`, `Cancelled`.
+`Decode` and `Convert` read alike and are not the same: the first is a stored
+value this build no longer understands, the second is `ebook-convert` failing. Core functions
 return `Result<T>` and propagate with early returns; the bridge layer collapses
 the taxonomy into a `status` string and an early return, which is omawrite's
 idiom.
