@@ -25,14 +25,12 @@ named and justified where it appears rather than left to be discovered.
 Two things are needed before a clone will run.
 
 **1. Qt 6.** `qt6-base`, `qt6-declarative`, `qt6-webengine`, `qt6-webchannel`,
-`qt6-multimedia`, `qt6-multimedia-ffmpeg`, `qt6-speech`, `qt6-imageformats`,
-plus `poppler` for PDF text and covers. Arch ships qmake as `qmake6`;
-`bin/build` resolves either name.
+`qt6-imageformats`, `qt6-svg`, plus `poppler` for PDF covers and text. Arch
+ships qmake as `qmake6`; `bin/build` resolves either name.
 
-`qt6-multimedia-ffmpeg` and `qt6-imageformats` are not optional and are easy to
-miss: without the first, `QMediaPlayer` plays nothing and reading aloud is
-silent with no error; without the second, WebP covers — which some EPUBs use —
-decode to nothing and the book gets no cover, also with no error.
+`qt6-imageformats` is not optional and is easy to miss: without it, WebP covers
+— which some EPUBs use — decode to nothing and the book gets no cover, with no
+error anywhere.
 
 **2. foliate-js.** The reader engine is not vendored and is gitignored. Without
 it the app builds and the library works, but opening a book renders nothing:
@@ -190,8 +188,8 @@ any work happens.
 omawrite's `Backend::countWords`, `normalizedLinkUrl` and `suggestedFileName` are
 static precisely so the tests can call them without an application, a window, or
 a file. Anything with a threshold, a heuristic, or a parse in it should be
-reachable that way — the text-quality classifier, the TTS chunker, the FTS query
-builder, the offline category rules, cosine similarity. If a test needs a
+reachable that way — the text-quality classifier, the FTS query builder, the
+offline category rules, the EPUB href resolver. If a test needs a
 `QQmlEngine` to reach your logic, the logic is in the wrong place.
 
 **`QPointer` for any QObject you did not create**, and for anything QML might
@@ -236,10 +234,9 @@ produces a runtime warning and a **silently dropped signal** — the nastiest bu
 class in this codebase.
 
 **1. Long, stateful, cancellable work: a worker `QObject` moved to a `QThread`.**
-The import pipeline and the TTS synthesis loop are this, and nothing else is. The
-worker owns its own database connection and its own `QNetworkAccessManager`,
-runs the chain linearly — a direct transliteration of the Rust code, not an async
-rewrite — and reports through signals:
+The import pipeline is this, and on this branch it is the only thing that is.
+The worker owns its own database connection, runs the chain linearly, and
+reports through signals:
 
 ```cpp
 auto *thread = new QThread(this);
@@ -261,12 +258,12 @@ it cannot own a connection or a session.
 Hashing a file, thumbnailing a cover, a brute-force similarity sweep.
 `QFutureWatcher::finished` fires on the GUI thread.
 
-**3. Network from the GUI thread: `QNetworkAccessManager`'s own signals.** QNAM
-is already asynchronous, so a user-initiated Ollama or Anthropic call needs no
-thread at all — `post()` plus a `finished` lambda. Inside a worker thread, where
-the code is linear, create a QNAM *in that thread* and block on a local
-`QEventLoop`; that is legitimate off the GUI thread and keeps the pipeline
-readable.
+**3. Network: there is none.** The branch that has an assistant needs a third
+pattern here; this one does not. If that changes, take it from
+`main-with-ai-features` rather than inventing a fourth — `QNetworkAccessManager`
+on the GUI thread for anything a user is waiting on, and a QNAM created *inside*
+a worker thread, blocked on a local `QEventLoop`, for anything running in a
+linear pipeline.
 
 **Never touch a QObject from the wrong thread.** `QMetaObject::invokeMethod(obj,
 ..., Qt::QueuedConnection)` is the escape hatch when there is no signal to hand.
@@ -516,24 +513,17 @@ until a PDF-only crash surfaced months later.
 
 ---
 
-## Optional services
+## No network, and no services
 
-Everything below degrades cleanly. The library, reader, search, highlights and
-import never depend on any of it, and the app must never show a modal because a
-service is missing — Settings shows status, and the feature's button is hidden or
-disabled.
+This branch talks to nothing. There is no model, no speech backend, no metadata
+provider and no telemetry; the books, the database and the covers are all local,
+and the app behaves identically with the cable out. `QNetworkAccessManager` is
+still linked because `QT += network` comes with `sql`, but nothing calls it.
 
-```bash
-docker compose up -d kokoro                # speech; falls back to qt6-speech
-ollama pull llama3.2:3b nomic-embed-text   # summaries, questions, embeddings
-```
-
-Background AI work is local only, opt in, and pauses off mains power, so
-unattended work cannot cost money. Keep it that way — the rule lives in one
-place, `core/ai/policy.cpp`, not at each call site, and every refusal carries a
-reason the UI can show.
-
----
+**If you are about to add something that makes a request, stop and read
+`SPEC.md` §9 first.** The whole point of this branch is that the reduction is
+real rather than a switch, and a feature that quietly reopens a socket undoes
+it.
 
 ## Traps
 
@@ -552,10 +542,6 @@ The short list of things that will cost you an hour each.
 - **Do not call into the page before `readerReady()`.** Silent no-op otherwise.
 - **`QProcess::errorOccurred`, not just `finished`**, or a missing `ebook-convert`
   hangs the import.
-- **`QNetworkAccessManager` has no default timeout.** Set
-  `setTransferTimeout` on every request, or a wedged Ollama hangs forever. If a
-  localhost request stalls at connect, turn off HTTP/2 for it
-  (`QNetworkRequest::Http2AllowedAttribute`).
 - **`QXmlStreamReader` is strict where quick-xml was not.** Match on
   `namespaceUri()` plus local name, never `qualifiedName()`, because real OPFs
   come as `<package>`, `<opf:package>` and worse; look up `href` and `media-type`

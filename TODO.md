@@ -20,6 +20,39 @@ Read it before starting any phase.
 
 ---
 
+## Phase S — Strip the AI and speech features — **done**
+
+This branch is the library and reader alone. The reduction is real rather than a
+switch: the code is deleted, the dependencies are gone, and the schema has been
+dropped.
+
+- [x] **Migration 006** drops `chunks_fts` and its triggers, `chunk_embeddings`,
+      `book_embeddings`, `book_chunks`, `summaries`, and the `books.chunked_at`
+      / `embedded_at` / `auto_tagged_at` columns. One-way by design (§4)
+- [x] **The runner vacuums after applying anything.** `DROP TABLE` frees pages
+      inside the file but never shrinks it; without this an indexed library
+      would sit at its old size for ever. 45 MB → **212 KB** on the real one,
+      with all 51 books and 6 notes intact
+- [x] `src/core/ai/` and `src/core/tts/` deleted, with `services.{h,cpp}` —
+      which did nothing but start Ollama and Kokoro
+- [x] `AiController`, `IndexWorker`, `TtsController`, `TtsWorker` deleted
+- [x] `AiPanel.qml`, `AskView.qml`, `AnswerBox.qml` deleted; `Reader.qml`,
+      `Main.qml` and `Sidebar.qml` trimmed
+- [x] `qt6-multimedia`, `qt6-multimedia-ffmpeg` and `qt6-speech` out of the
+      `.pro` and the PKGBUILD; `compose.yml` gone
+- [x] `LibraryModel::showRankedBooks` and `pdfPageText` removed — the first
+      existed only to receive the Ask answer's ranked ids, the second only to
+      feed PDF pages to read-aloud
+- [x] **Settings rebuilt around a LIBRARY section** — the remembered import
+      folder, and an Import now button. Every previous section was AI or speech
+- [x] **`text_quality` becomes visible instead of vanishing.** It used to gate
+      read-aloud; it is now a badge on the cover for `poor` and `none`, so a
+      scanned PDF is something you can see is a scan (§7.2)
+- [ ] Search is FTS5 and filters only, as it always was — confirm nothing in the
+      UI still implies semantic ranking
+
+---
+
 ## Phase P0 — Scaffolding and spikes — **done**
 
 - [x] Repo, `git init`, MIT licence, `.gitignore`, `docs/`
@@ -191,66 +224,13 @@ and it is the cheapest place to be wrong.
 
 ---
 
-## Phase P3 — Speech and AI core
+## Phase P3 — Speech and AI core — **removed on this branch**
 
-Still no Qt Quick. This is the rest of `omabook-core`.
-
-- [x] **`tts/chunker.{h,cpp}`** — 220 then 600 characters, whitespace collapsed,
-      sentence terminators consuming trailing quotes/brackets/spaces, word-
-      boundary fallback, hard cut for a single over-long word, **splitting on
-      character and never byte boundaries**
-- [x] **`tts/kokoro.{h,cpp}`** — `GET /health`, `GET /v1/audio/voices` (accepting
-      both the bare-string and object response shapes),
-      `POST /v1/audio/speech` with `{model, input, voice, response_format, speed}`.
-      Empty text rejected before any request. Output cached to
-      `{cache}/tts/{sha256(voice \0 text)[:32]}.wav`
-- [x] **`ai/vectors.{h,cpp}`** — little-endian float blobs in `QByteArray`
-      (deep-copied, `memcpy`'d back out, never aliased); cosine returning 0 on
-      mismatch rather than NaN; `nearestInBook` with the `ordinal <= n` bound;
-      **hybrid blending at weight 0.85 with per-chunk max**; FTS rank normalised
-      as `strength / (strength + 4)`; keyword terms `OR`-joined with terms of two
-      characters or fewer dropped
-- [x] **`ai/power.{h,cpp}`** — `/sys/class/power_supply`, reading `type`,
-      `online`, `status`, `scope` per supply. An online `Mains` supply wins on a
-      first pass before any battery is consulted; `scope=Device` is a peripheral;
-      a missing directory is mains
-- [x] **`ai/policy.{h,cpp}`** — `WorkPolicy::permits` in the exact six-step order
-      of §5.5, defaulting to off, every refusal carrying a reason
-- [x] **`ai/prompts.{h,cpp}`** — the four templates **verbatim**, including the
-      U+2014 em dash in `askBook` and the conditional context lines that leave no
-      empty labels
-- [x] **`ai/ollama.{h,cpp}`** — `GET /api/tags`, `POST /api/generate`
-      (`num_predict: 500`, `temperature: 0.3`, `stream: false`),
-      `POST /api/embeddings`. Strip a `<think>…</think>` preamble. Empty text
-      rejected before any request
-- [x] **`ai/anthropic.{h,cpp}`** — `POST /v1/messages` with `x-api-key` and
-      `anthropic-version: 2023-06-01`, `max_tokens: 2048`. **`stop_reason ==
-      "refusal"` on a 200 is an error.** `available()` makes no request
-- [x] **`ai/indexer.{h,cpp}`** — paragraph packing at 1200 target / 120 minimum
-      with a hard split past 2×; embedding only chunks with no row yet, so a run
-      resumes; a cancel predicate checked per chunk; metadata embedding skipped
-      when the source hash is unchanged
-- [x] **`ai/assistant.{h,cpp}`** — three scopes with `so_far` the default for an
-      unrecognised value, 8 passages, 20 library candidates, excerpts flattened
-      and truncated to 160 characters, provider selection through the policy
-- [x] **`services.{h,cpp}`** — `systemctl --user start ollama.service` then
-      `ollama serve` detached; `docker start omabook_kokoro` then
-      `docker compose up -d kokoro`. A missing tool is reported before anything
-      is run, waiting gives up rather than hanging, and every failure message
-      says what to do
-- [x] **Tests** (16 in TtsTest, 37 in AiTest): the chunker's eight cases including the multibyte and
-      infinite-loop guards; Kokoro's voice-shape parsing, cache determinism, URL
-      normalisation, empty-text guard and unreachable-service behaviour; vectors'
-      round trip, truncated blob, identical/opposite/orthogonal scores,
-      magnitude independence, mismatch safety, term filtering, rank ordering;
-      power's five cases including **the wireless keyboard**; the policy's seven
-      rules including **background can never reach a remote provider**; the
-      prompts' context handling and the two guard phrases; Ollama's think-strip
-      and locality; Anthropic's text-block joining, remoteness, and
-      **availability without a request**; the indexer's packing and hashing;
-      the assistant's scope default and excerpting; services' four cases
-
----
+Ported in full, then deleted here along with the features it served (SPEC §5.4
+to §5.8). It stands on `main-with-ai-features`: the Kokoro client and sentence
+chunker, Ollama and Anthropic, the work policy and its AC-power detection,
+vectors and cosine, the prompts, the indexer and the assistant. 53 of the
+suite's tests went with it.
 
 ## Phase P4 — Application shell
 
@@ -277,7 +257,7 @@ The first phase with a window in it.
       that name)**, `followSystemTheme` started from QML rather than the
       constructor, and a refresh that writes **only the fields that changed**
 - [x] **`src/app/assets.{h,cpp}`** — the four-tier reader-asset search and the
-      percent-encoded reader URL (§5.3); `composeDir()` for Kokoro
+      percent-encoded reader URL (§5.3)
 - [x] **`src/app/app.qrc`** — every `.qml` aliased flat to `qrc:/`, plus the
       brand mark. **Not** `spike.html` (§5.12)
 - [ ] `qml/Theme.qml` and `qml/Icons.qml` registered with
@@ -360,47 +340,10 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 
 ---
 
-## Phase P7 — Reading aloud and the assistant (§5.4–5.8)
+## Phase P7 — Reading aloud and the assistant — **removed on this branch**
 
-- [x] **`bridge/ttscontroller.{h,cpp}`** — `speaking`, `continuous`, `status`,
-      `engine`, `chunksLeft`, `paused`, `speed`, `voice`, `voices`; the
-      `playAudio`, `speakSystem`, `needNextPage`, `finished`, `pauseRequested`
-      and `stopPlayback` signals; `startReading`, `continueWithPage`,
-      `chunkFinished`, `chunkFailed`, `stop`, `togglePause`, `changeSpeed`,
-      `refreshEngine`, `refreshVoices`, `changeVoice`
-  - [ ] Synthesis on a worker thread with its own `QNetworkAccessManager`, one
-        chunk prefetched ahead
-  - [ ] **A generation counter discards results from an abandoned session**
-  - [ ] **`stopPlayback` is its own signal** — clearing `speaking` leaves a chunk
-        already handed to the player running to its end
-  - [ ] A failed synthesis re-queues its chunk to the front rather than losing it
-  - [ ] Falls back to `qt6-speech` when Kokoro is absent, and **checks that the
-        system engine actually has voices** (§5.4)
-  - [ ] Under 20 trimmed characters is refused with "nothing readable on this page"
-  - [ ] The page-exhausted → `omabookAdvance()` → re-chunk loop, with the 250 ms
-        settle for PDFs
-- [x] **`bridge/aicontroller.{h,cpp}`** — the full property set including
-      `indexing`/`indexDone`/`indexTotal`, `backgroundEnabled`,
-      `backgroundOnBattery`, `onMains`, `starting`, `serviceMessage`,
-      `localModel`, `localModels`, `remoteModel`, `hasRemoteKey`;
-      `summarizePage`, `askBook`, `askLibrary`, `indexLibrary`, `indexBook`,
-      `cancelIndexing`, `indexState`, the two background setters, `startOllama`,
-      `startKokoro`, `refresh`, `clearAnswer`, `refreshModels`, and the model/key
-      setters
-  - [ ] `libraryAnswered(ids)` wired to `LibraryModel::showRankedBooks`
-  - [ ] The policy re-checked **per book** during a library index, so unplugging
-        mid-run is respected, and partial work is kept on cancel
-  - [ ] **Settings precedence: stored setting, then environment, then default.**
-        The key itself is never exposed to QML
-  - [ ] **Results written before `busy` is cleared**
-- [ ] `AiController` and `TtsController` instantiated per-screen, not as
-      singletons (§5.13)
-- [ ] Port `Reader.qml`'s TTS chrome, `AiPanel.qml`, `AskView.qml`,
-      `SettingsView.qml`, `SettingsHeading.qml`, `SettingsRow.qml`
-- [ ] An hour of auto-read without drift, leak, or desync between audio and the
-      displayed page
-
----
+`TtsController` and `AiController`, their worker threads, and `AiPanel.qml`,
+`AskView.qml` and `AnswerBox.qml`. See `main-with-ai-features`.
 
 ## Phase P8 — Parity check
 
@@ -410,17 +353,6 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [x] `--headless-check`, `--verify-reader` on an EPUB **and** a PDF,
       `--probe-queue` and `--probe-highlight` all pass, and `--probe-queue`
       reorders identically to the Rust build run side by side
-- [x] `--probe-ask` — the whole library-Q&A path: the question embedded, KNN
-      over `book_embeddings`, 20 books ranked back into the grid, and prose
-      from `ollama/llama3.2:3b`
-- [x] `--probe-summary` — the reader's assistant: 1,131 characters pulled off
-      the page through the WebChannel bridge and summarised in the ported
-      prompt's own shape
-- [ ] `--probe-tts` and `--probe-audio` — **blocked**: Kokoro is not running
-      (docker needs a group this shell does not have) and `speech-dispatcher`
-      fails to load, so neither speech path can be exercised here. The app
-      degrades as it should meanwhile — the reader opens and reads fine with no
-      speech at all
 - [x] `--probe-import` — three books into a scratch library: categories from
       their folders, Devanagari titles intact, `text_quality` assessed (the PDF
       scored `poor`), subject tags extracted, covers thumbnailed. **31
@@ -429,7 +361,6 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [x] Covers are thumbnailed as intended: 320x410, 320x414, 320x425 against the
       Rust build's 398x510, 680x880 and 564x750 originals — aspect preserved,
       all re-encoded to JPEG, 392 KB down to 110 KB
-- [ ] `--probe-ai`
 - [ ] **Run the probes against a scratch `HOME`.** They write to the real
       library — the queue probe reorders your actual reading queue — and a
       probe combined with `--open` measures a screen the reader is covering
@@ -458,7 +389,7 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [ ] The reader assets installed to `/usr/share/omabook/reader`
 - [ ] Publish to the **AUR** as `omabook`
 - [ ] **Backup layer 1 (§5.11)** — `VACUUM INTO` on clean exit and as a
-      pre-backup hook; exclude patterns for thumbnails, TTS cache and scratch;
+      pre-backup hook; exclude patterns for thumbnails and extracted-text scratch;
       document how it composes with Omarchy's restic backup
 - [ ] **Log it in `~/omarchy-setup.md`** under *Applications*: what, where, why,
       how to apply and verify, how to undo — package, desktop entry, mime
@@ -473,9 +404,6 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 
 Carried across unchanged, in rough order of value.
 
-- [ ] **MPRIS** with title, chapter, cover art and position, and working
-      play/pause/next — this is what lights up the Omarchy bar (§3.5), and Qt has
-      no MPRIS class, so it is `QtDBus` by hand
 - [ ] **Honour `omarchy display text size` / `text-scaling-factor` live** (§3.5).
       omawrite's `systemtheme.cpp` does exactly this and ports nearly verbatim —
       the cheapest remaining integration win
@@ -487,19 +415,7 @@ Carried across unchanged, in rough order of value.
 - [ ] Re-read metadata for books already imported. Import is idempotent by
       content hash, so a fixed extractor does not retroactively improve existing
       rows — they must be deliberately refreshed
-- [ ] `AutoTag` — one local inference per book returning tags and a category,
-      with **new tags constrained to a fixed vocabulary**; medialib's
-      unconstrained version fed a runaway loop
 - [ ] Manual tag and category editing
-- [ ] Voice picker (the service lists 60+; the fetch already exists)
-- [ ] Explain-selection UI (the prompt exists)
-- [ ] A settings surface for the work policy and provider choice — today
-      background indexing is switched on implicitly by "Index library"
-- [ ] Semantic ranking in the sidebar search box; the book-level vectors exist
-- [ ] Retrieval quality: definitional questions ("what is the Pequod?") still
-      answer poorly. Reranking, chunk overlap, or a larger local model
-- [ ] Chapter and book summaries, generated on request and cached — deliberately
-      never precomputed (§5.5)
 - [ ] Arrow left/right for previous/next page
 - [ ] Match the active Omarchy theme's accent beyond dark/light
 - [ ] Reading statistics; smart shelves

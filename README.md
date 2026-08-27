@@ -1,8 +1,12 @@
 # OmaBooks
 
 A book library and reader for Omarchy, built with Qt Quick and C++. Reads EPUB,
-PDF and MOBI, follows your system light/dark theme, and can read a book aloud,
-summarize a page, or answer questions about your library, all locally.
+PDF and MOBI, follows your system light/dark theme, and keeps your reading
+position, highlights and notes as you go.
+
+**This branch has no AI.** No assistant, no summaries, no question answering, no
+reading aloud, and nothing that talks to a model or a speech service. If you
+want those, they are on `main-with-ai-features`; see *Two branches* below.
 
 > **Status: in progress.** This is a port of
 > [omabook](https://github.com/newx/omabook) from Rust to C++, so that it is
@@ -39,9 +43,6 @@ all stay uncategorised rather than guessed.
 | Turn the page | click the page edges, or arrow keys |
 | Highlight a passage | select text, then **Highlight** |
 | Write a note | select text, then **Note** |
-| Read aloud | **Read page**, or **Auto read** to keep turning pages |
-| Ask about the book | the **Assistant** panel in the reader |
-| Ask about the library | the **Ask** page in the sidebar |
 
 Reading position, highlights and notes are saved as you go. Books move from
 unread to reading on first open, and to finished near the end.
@@ -49,24 +50,12 @@ unread to reading on first open, and to finished near the end.
 ## Requirements
 
 Qt 6 (`qt6-base`, `qt6-declarative`, `qt6-webengine`, `qt6-webchannel`,
-`qt6-multimedia`, `qt6-multimedia-ffmpeg`, `qt6-imageformats`, `qt6-speech`,
-`qt6-svg`), `poppler` for PDF text and covers, and `xdg-desktop-portal` with a
-backend.
+`qt6-imageformats`, `qt6-svg`), `poppler` for PDF text and covers, and
+`xdg-desktop-portal` with a backend.
 
-Everything below is optional. The library, reader, search, highlights and
-import all work without any of it.
-
-| For | Install | Notes |
-|---|---|---|
-| Reading aloud | `docker compose up -d kokoro` | Kokoro-82M, runs locally |
-| Summaries and questions | `ollama` + `ollama pull llama3.2:3b nomic-embed-text` | runs locally |
-| Searching inside MOBI books | `calibre` | MOBI reads and imports without it |
-| Fallback voice | `speech-dispatcher` or `flite` | used when Kokoro is not running; without one, reading aloud is greyed out |
-
-Remote models are supported for questions and summaries by setting
-`ANTHROPIC_API_KEY`, but they are never used by background work: indexing is
-local only, opt in, and pauses off mains power, so unattended work cannot cost
-money.
+`calibre` is optional, for importing MOBI and AZW3 files; everything else works
+without it. Nothing here reaches the network at all — the books, the database
+and the covers are all local, so the app works the same with the cable out.
 
 ## Building
 
@@ -86,20 +75,33 @@ git clone https://github.com/johnfactotum/foliate-js.git assets/reader/foliate-j
 The scripts exist to resolve one thing: Arch ships qmake as `qmake6` and other
 distributions ship it as `qmake`.
 
-The source is two directories. `src/core` holds the library, import pipeline,
-speech and AI, and knows nothing about QML at all; `src/app` is the Qt Quick
+The source is two directories. `src/core` holds the library, the import
+pipeline and search, and knows nothing about QML at all; `src/app` is the Qt Quick
 front end on top of it. That separation is enforced by the test build's module
 list rather than by convention — see [CLAUDE.md](CLAUDE.md).
+
+## Two branches
+
+`main-with-ai-features` is the full application: an assistant in the reader,
+questions answered from the whole library, page summaries, and reading aloud
+with automatic page turns.
+
+**This branch removes all of it**, and it is a real reduction rather than a
+hidden switch — around 4,200 lines of C++ and three QML screens are gone, along
+with the dependencies on `qt6-multimedia`, `qt6-multimedia-ffmpeg` and
+`qt6-speech`. Migration 006 drops the embedding and summary tables too, which
+on a fully indexed library took the database from 45 MB to 212 KB.
+
+The migration is one-way: a library opened here loses its embeddings, and
+re-indexing on the other branch costs roughly two minutes a book. Everything
+else is shared, so a book, a bookmark, a highlight or a note written on either
+branch reads fine on the other.
 
 ## Acknowledgements
 
 Reading is handled by [foliate-js](https://github.com/johnfactotum/foliate-js),
 the engine behind the Foliate reader, which covers EPUB, MOBI, AZW3, FB2, CBZ
 and PDF behind one API.
-
-Speech uses [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) through
-[Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI). Local models run on
-[Ollama](https://ollama.com).
 
 The build and house style follow
 [omawrite](https://github.com/omacom-io/omawrite) by omacom-io.

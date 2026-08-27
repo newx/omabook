@@ -3,11 +3,18 @@
 A personal book library and reader, in the spirit of Apple Books, built as a
 native Omarchy app in the idiom of `omawrite` and `omacalc`.
 
-**Status:** specification for a port. A working Rust implementation exists at
-`~/Projects/omabook`; this document specifies the same product in C++17 and
-Qt 6, and records every decision that changes in the move.
+**Status:** specification for a port, on the branch that removes the AI and
+speech features. A working Rust implementation exists at `~/Projects/omabook`;
+this document specifies the same product in C++17 and Qt 6, and records every
+decision that changes in the move.
+**Branch:** `strip-ai-features`. The full application, with the assistant and
+reading aloud, is `main-with-ai-features`.
 **Date:** 2026-08-27
 **Location:** `~/Projects/omabook-cplus`
+
+Sections §5.4 to §5.8, §6.2 and §7.4 describe features this branch removes.
+They are kept as stubs rather than deleted so the numbering — which code
+comments cite as `SPEC §x` — still means the same thing on both branches.
 
 Section numbers are kept from the Rust `SPEC.md` so that the `SPEC §x`
 references scattered through the original source still resolve. Where a section
@@ -26,13 +33,11 @@ left running.
 - Organizes them by **categories** (a tree, one per book) and **tags** (many per
   book), assigned at import and editable by hand.
 - Reads them with real pagination and position memory.
-- **Reads them aloud**, page by page, turning pages by itself until the book ends.
-- Summarizes the current page, answers questions about the current page or
-  everything read so far, and answers questions about the library as a whole.
 - Tracks reading progress and completion, and keeps an ordered reading queue.
 - Holds highlights and notes, anchored to the passage they came from.
 
-Single user, single machine. A headless `omabook serve` mode for reading on a
+Single user, single machine, and **no network at all** — no model, no speech
+service, no metadata lookup. A headless `omabook serve` mode for reading on a
 tablet or phone is deliberately deferred (§6.3).
 
 ---
@@ -89,9 +94,9 @@ plugin could never satisfy — an application controls its own `main()`.
   ones §5.12 lists.
 - **The SQL.** All five migrations move across byte-for-byte (§4).
 - **The prompt set** (§5.6–5.8), verbatim, including its punctuation.
-- **The measured constants** — TTS chunk sizes, text-quality thresholds, the
-  hybrid retrieval weight, the completion threshold. These were arrived at
-  against a real library and are not to be re-derived.
+- **The measured constants** — the text-quality thresholds and the completion
+  threshold. These were arrived at against a real library and are not to be
+  re-derived.
 
 What is genuinely rewritten is the ~5,700 lines of Rust core logic and the
 ~2,900 lines of cxx-qt bridge. That is the work.
@@ -105,20 +110,15 @@ What is genuinely rewritten is the ~5,700 lines of Rust core logic and the
 | Bridge | cxx-qt + cxx-qt-build | **none — C++ QObjects directly** | the whole point |
 | Build | Cargo | **qmake** (`omabook.pro`) | omawrite's toolchain; verified on the full module set (`docs/spikes.md`) |
 | DB | `rusqlite` (bundled SQLite) | **`QSqlDatabase` / `QSQLITE`** | WAL, FTS5 with `remove_diacritics 2`, and `VACUUM INTO` all verified present |
-| Vectors | `f32` blobs, cosine in Rust | **`QByteArray` blobs, cosine in C++** | unchanged design; still no ANN index (§4.1) |
 | Reader | `WebEngineView` + foliate-js | **unchanged** | |
 | Host ⇄ reader | `QWebChannel` | **unchanged** | |
-| Audio | `qt6-multimedia` | **unchanged** — needs `qt6-multimedia-ffmpeg` | without the ffmpeg backend `QMediaPlayer` is silent with no error |
 | EPUB zip | `zip` crate | **`QZipReader`** (`QtCore/private/qzipreader_p.h`, `QT += core-private`) | verified against real EPUBs; stored+deflate only, which is all EPUB permits |
 | EPUB XML | `quick-xml` | **`QXmlStreamReader`** | stricter — needs namespace matching and an entity resolver (§5.2) |
-| PDF text | `pdftotext` (process) | **unchanged** | |
+| PDF text | `pdftotext` (process) | **unchanged** | now only for the text-quality heuristic (§7.2) |
 | PDF covers | `pdftoppm` (process) | **unchanged** | |
 | MOBI/AZW3 | `ebook-convert` (process) | **unchanged** | |
 | Covers | raw bytes, content-addressed | **`QImageReader` + `setScaledSize`** | the Rust build stored the extracted image at full size; the port thumbnails it (§5.2) |
 | Jobs | tokio runtime | **worker `QObject` on a `QThread`** | see §6.4 |
-| HTTP | `reqwest` blocking | **`QNetworkAccessManager`** | async on the GUI thread, blocking on a local `QEventLoop` inside a worker |
-| TTS | Kokoro HTTP; `qt6-speech` fallback | **unchanged** | |
-| LLM | Ollama; Anthropic | **unchanged** | |
 | Errors | `thiserror` + `Result<T, E>` | **`core/result.h`** (§8) | no exceptions anywhere |
 | Packaging | PKGBUILD, cargo build | **PKGBUILD, `bin/build`** | as omawrite does it |
 
@@ -140,17 +140,12 @@ omabook-cplus/
 │   │   ├── repo/            # BookRepository, NoteRepository, Taxonomy, Settings
 │   │   ├── import/          # scanner, hash, metadata, epub, mobi, pdf,
 │   │   │                    #   covers, classify, pipeline
-│   │   ├── ai/              # vectors, policy, power, indexer, prompts,
-│   │   │                    #   ollama, anthropic, assistant
-│   │   ├── tts/             # chunker, kokoro
-│   │   ├── omarchy.{h,cpp}   # the active Omarchy theme, and watching it
-│   │   └── services.cpp     # start ollama / kokoro
+│   │   └── omarchy.{h,cpp}  # the active Omarchy theme, and watching it
 │   └── app/
 │       ├── app.pri  app.qrc
 │       ├── main.cpp  assets.cpp
 │       ├── bridge/          # LibraryModel, ReaderBridge, SidebarModel,
-│       │                    #   NotesModel, TtsController, AiController,
-│       │                    #   ThemeModel
+│       │                    #   NotesModel, ThemeModel
 │       └── qml/             # 23 files, aliased flat into qrc:/
 ├── tests/tests.pro  tests/tst_omabook.cpp
 ├── assets/
@@ -174,8 +169,9 @@ system. The reader assets are **not** embedded — see §5.3.
 ### 2.6 Hardware
 
 Unchanged. Beelink SER9 Max (H255), Ryzen 7 255, 8c/16t, 58 GiB usable, iGPU
-only. Plan for CPU inference; local for embed/tag/short-summary, remote for
-long-form Q&A. Per-task model routing is configuration from day one.
+only. Nothing on this branch is compute-bound: with no inference the machine is
+comfortably ahead of the work, and the heaviest thing import does is render a
+PDF cover.
 
 ---
 
@@ -211,10 +207,9 @@ Own git repo, `pkgbuild/PKGBUILD` in it, `bin/install` wrapping `makepkg -fsi`.
 
 ```
 depends=(hicolor-icon-theme poppler qt6-base qt6-declarative qt6-imageformats
-         qt6-multimedia qt6-multimedia-ffmpeg qt6-speech qt6-webchannel
-         qt6-webengine xdg-desktop-portal)
+         qt6-svg qt6-webchannel qt6-webengine xdg-desktop-portal)
 makedepends=(qt6-base)
-optdepends=(ollama docker calibre speech-dispatcher flite)
+optdepends=(calibre)
 ```
 
 Two additions over the Rust PKGBUILD, both found during the port and both
@@ -253,7 +248,23 @@ that is a test.
 004_embeddings.sql       chunk_embeddings, book_embeddings (BLOB vectors),
                          books.chunked_at
 005_chunk_search.sql     chunks_fts FTS5 over book_chunks + sync triggers
+006_drop_ai.sql          THIS BRANCH. Drops chunks_fts and its triggers,
+                         chunk_embeddings, book_embeddings, book_chunks,
+                         summaries, and books.chunked_at / embedded_at /
+                         auto_tagged_at
 ```
+
+**006 is one-way, and that is the point.** A library opened here loses its
+embeddings; re-indexing on `main-with-ai-features` costs roughly two minutes a
+book. Everything a reader actually writes — position, highlights, notes, the
+queue, favourites — is untouched, so a book read on either branch reads fine on
+the other. `metadata_fetched_at` stays: online metadata lookup is not an AI
+feature and is still on the roadmap.
+
+**The runner vacuums after applying anything.** `DROP TABLE` frees pages inside
+the file but never shrinks it, so without that step an indexed library would sit
+at its old size for ever. Measured on the real one: 45 MB before, **212 KB**
+after, with all 51 books and 6 notes intact.
 
 Points that are easy to lose and must not be:
 
@@ -271,12 +282,10 @@ Points that are easy to lose and must not be:
 
 ### 4.1 On vector-search scale
 
-Unchanged. Hundreds of books, a few hundred thousand chunks. Two of the three
-retrieval scopes need no index at all, and the third is a few hundred rows.
-`chunk_embeddings` and `book_embeddings` are ordinary tables with `BLOB`
-columns — **not** `sqlite-vec` virtual tables, which were alpha and unnecessary
-at this size. Brute-force cosine in C++, with each vector's norm stored beside
-it so query time is a dot product. Benchmark before optimizing.
+**Removed with §5.7 and §5.8.** For the record, the design was brute-force
+cosine over `f32` blobs rather than an ANN index, on the grounds that a personal
+library is a few hundred thousand chunks at most and an index would be
+optimising a millisecond. It stands on `main-with-ai-features`.
 
 ---
 
@@ -360,7 +369,7 @@ QML around the web view, not HTML inside it.
 
 **The split is a hard constraint:** JavaScript owns rendering, pagination, CFI,
 visible-range text extraction and `advanceToNextPage()`; C++ owns the database,
-progress, TTS orchestration, AI calls, and everything else. C++ never guesses
+progress, and everything else. C++ never guesses
 what is on screen — it asks. That is what keeps the backend format-agnostic.
 
 **The protocol, ported verbatim.** The page exposes `window.omabookNext`,
@@ -432,116 +441,51 @@ Delete both once the engine ships the methods.
 
 ### 5.4 TTS with autoplay
 
-The signature feature.
+**Removed on this branch.** It lives on `main-with-ai-features`, unchanged and
+working; the section number is kept so that the `SPEC §x` references in code
+and in the other branch's history still resolve.
 
-```
-ask JS for the visible page text
-chunk it at sentence boundaries
-  first chunk  ≈ 220 chars   (small, so audio starts in seconds)
-  later chunks ≈ 600 chars
-synthesize chunk N+1 while chunk N plays
-when the page runs out: advance the page → re-chunk → continue
-until stopped or the book ends
-```
-
-The chunk sizes are measured, not guessed: 2000 characters take ~48 s to
-synthesize before a word is heard and 4000 take ~98 s and return 11 MB.
-Synthesis runs at roughly 2.4× realtime, so a small first chunk plus one-ahead
-prefetching makes the wait a few seconds.
-
-The chunker collapses whitespace, splits on sentence terminators (consuming
-trailing quotes, brackets and spaces so punctuation stays with its sentence),
-and falls back to splitting on the last space before the limit — and to a hard
-character cut for a single word longer than the limit, so it can neither loop
-forever nor split a multi-byte character.
-
-**Two modes:** *Read page* stops at the end of the page; *Auto read* turns pages
-until the book ends.
-
-Three behaviours that look like details and are not:
-
-- **A generation counter guards abandoned sessions.** It is bumped on every stop
-  and halt; a synthesis result arriving with a stale generation is discarded.
-  Without it a slow Kokoro response resurrects playback after the user hit Stop.
-- **Stopping emits its own signal.** Clearing `speaking` is not enough: a chunk
-  already handed to the player runs to its natural end, up to 600 characters and
-  tens of seconds.
-- **"Can speak" is not "is the engine kokoro".** On a desktop with neither
-  `speech-dispatcher` nor `flite`, Qt's system engine sits in an error state with
-  no voices, `say()` is silent, and the state transition that advances the chunk
-  loop never arrives — a session claims to be reading, plays nothing, and never
-  ends. The check is `engine != "system" || availableVoices().length > 0`, read
-  once because voices are an enumeration and not a reactive property.
-
-TTS is offered with a warning for `text_quality = poor`, and the controls gate
-on `text_quality != none`.
-
-**MPRIS** carries title, chapter, cover art and position, with working
-play/pause/next, which is what lights up the Omarchy bar. Still outstanding.
+For the record, what went: the page-by-page read-aloud loop with automatic page
+turns, its measured chunk sizes, the generation counter that stopped an
+abandoned session's audio resurfacing, and the Kokoro and `qt6-speech` backends
+behind them. `qt6-multimedia`, `qt6-multimedia-ffmpeg` and `qt6-speech` left the
+dependency list with it.
 
 ### 5.5 What AI work may run unattended
 
-**The rule everything rests on:**
+**Removed on this branch.** It lives on `main-with-ai-features`, unchanged and
+working; the section number is kept so that the `SPEC §x` references in code
+and in the other branch's history still resolve.
 
-> Background work never uses a remote provider.
-
-`WorkPolicy::permits(task, trigger, provider, power)` is evaluated in exactly
-this order, in one place, and every refusal carries a reason the UI can show:
-
-1. `Interactive` → **Allow**. A human clicked and is waiting; their call.
-2. `Remote` → **Refuse**, "background work never uses a remote provider, so it
-   cannot cost money".
-3. generative task → **Refuse**, "summaries are generated on request, never in
-   bulk" — even locally, even with background enabled.
-4. background not enabled → **Refuse**.
-5. on battery and not permitted on battery → **Defer**, "waiting for mains power".
-6. otherwise **Allow**.
-
-Everything defaults to off. Only embedding can ever run unattended.
-
-Power is read from `/sys/class/power_supply`, and the order matters: an online
-supply of `type=Mains` wins immediately regardless of directory enumeration
-order; a battery with `scope=Device` is a wireless keyboard, not the machine;
-a missing or unreadable directory counts as mains, because a desktop must not be
-blocked by the absence of a battery.
-
-Measured on the real library: metadata embedding for all 55 books takes 1.8 s
-total; full chunking and embedding of Moby-Dick alone takes 123 s. That ratio is
-why library-wide questions are cheap and per-book indexing is opt-in.
+The rule it enforced — *background work never uses a remote provider* — has no
+subject here: nothing runs in the background and nothing is remote. It is worth
+knowing it existed, because it is the reason the AC-power detection in
+`core/ai/power.cpp` existed too, and why both are gone rather than one.
 
 ### 5.6 Page summarization
 
-On demand from the text the reader extracted; never precomputed. Cached in
-`summaries`. Prompts ported verbatim — use only the supplied text, preserve
-names and conclusions, add no outside knowledge, 3–5 bullets or ≤150 words.
+**Removed on this branch.** It lives on `main-with-ai-features`, unchanged and
+working; the section number is kept so that the `SPEC §x` references in code
+and in the other branch's history still resolve.
 
 ### 5.7 Q&A about the book
 
-| Scope | Retrieval |
-|---|---|
-| `page` | none — the page text is the context |
-| `so_far` | chunks with `ordinal <= current`. **Cannot leak ahead of the reader.** The default when a scope is unrecognised |
-| `book` | all chunks |
+**Removed on this branch.** It lives on `main-with-ai-features`, unchanged and
+working; the section number is kept so that the `SPEC §x` references in code
+and in the other branch's history still resolve.
 
-Retrieval is **hybrid**: brute-force cosine blended with FTS5 over the same
-chunks. Vector search answers "what does Ishmael say when he feels grim" well
-and "what is the Pequod" badly; keyword search is strong exactly where cosine is
-weak. Keyword hits are weighted **0.85** and merged by taking the higher score
-per chunk — a corrective, not the primary signal. FTS5's negative rank is mapped
-into (0,1) by `strength / (strength + 4)`.
-
-Keyword terms are disjunctive here (`OR`-joined, terms of two characters or
-fewer dropped) — unlike the library search box, which is conjunctive. Eight
-passages, maximum.
-
-Answers are grounded: if the context does not support an answer, say so.
+The `book_chunks` table and its `ordinal` column existed to make the `so_far`
+scope spoiler-free. Migration 006 drops them (§4).
 
 ### 5.8 Q&A about the library
 
-Embed the question, cosine over `book_embeddings`, take the top 20, ask for a
-short prose recommendation over *only* those titles. Degrades to keyword search
-with no prose answer when embeddings or the model are unavailable. **The books
-are the product; the prose is a bonus.**
+**Removed on this branch.** It lives on `main-with-ai-features`, unchanged and
+working; the section number is kept so that the `SPEC §x` references in code
+and in the other branch's history still resolve.
+
+`book_embeddings` and the brute-force cosine over it went with this. Library
+search is unaffected: it was always FTS5 and filters, and semantic ranking in
+the search box was never built (§5.1).
 
 ### 5.9 Progress and completion
 
@@ -615,10 +559,6 @@ The QML moves across nearly intact. The edits:
 
 Recorded because each is deliberate and none is self-evident:
 
-- **`AiController` and `TtsController` are instantiated more than once**, with
-  independent state — the reader's assistant, the library's Ask page, and
-  Settings' voice picker. Making them singletons would mean a page summary and a
-  library question could not run at once.
 - **Result properties are written before the busy flag is cleared**, everywhere.
   A handler on `busyChanged` reading the results in the same tick would
   otherwise see the previous operation's values.
@@ -645,12 +585,6 @@ Recorded because each is deliberate and none is self-evident:
   quietly override the picker that claims to control it. The remote API key
   follows the same order and its value is never exposed back to QML, only
   `hasRemoteKey`.
-- **Ollama responses are stripped of a `<think>…</think>` preamble** when one
-  arrives despite `stream: false`.
-- **An Anthropic refusal arrives as HTTP 200** with `stop_reason: "refusal"` and
-  must be checked explicitly.
-- **`Anthropic::available()` makes no network request** — it is "is the key
-  non-blank" — so a availability check is never billable.
 - **A book row is inserted idempotently on `file_hash`**, returning the existing
   id. Import is therefore safe to re-run, and a fixed extractor does *not*
   retroactively improve existing rows: they must be deliberately refreshed.
@@ -666,11 +600,10 @@ session, no login.
 
 ### 6.2 Local AI services
 
-Ollama as a native systemd user service; Kokoro-FastAPI in a container. Both
-optional at runtime. **The app must degrade cleanly when they are absent**: no
-TTS button, no AI panel, everything else works. A book reader that refuses to
-open a book because Ollama is down is a broken book reader. Show status in
-Settings, never as a modal. `qt6-speech` is the dependency-free TTS fallback.
+**Removed on this branch.** There are no services, local or otherwise: no
+Ollama, no Kokoro container, no `compose.yml`. Nothing this application does
+requires anything else to be running, which was the direction §6.1 was already
+pointing.
 
 ### 6.3 The deferred `omabook serve` mode
 
@@ -686,10 +619,10 @@ The Rust build spawned one `std::thread` per background operation and posted
 results back through cxx-qt's `qt_thread()` handle. There was no thread pool.
 
 The C++ equivalent is three patterns and no more, set out in CLAUDE.md: a worker
-`QObject` moved to a `QThread` for the import pipeline and the TTS synthesis
-loop; `QtConcurrent::run` with a `QFutureWatcher` for one-shot computation; and
-`QNetworkAccessManager`'s own signals for network work on the GUI thread. The
-only channel between threads is a queued signal-slot connection.
+`QObject` moved to a `QThread` for the import pipeline, which on this branch is
+the only long-running work there is; and `QtConcurrent::run` with a
+`QFutureWatcher` for one-shot computation. The only channel between threads is a
+queued signal-slot connection.
 
 Two rules that were implicit in Rust and must be explicit here: **a
 `QSqlDatabase` connection belongs to one thread** — the Rust build opened a
@@ -728,8 +661,11 @@ library: readable books scored word-like ≥0.68 and symbol ratio ≤0.016; the 
 broken book — a PDF whose text is an unmapped symbol font — scored 0.29 and 0.19.
 Length alone did not catch it.
 
-`good` turns everything on, `poor` warns, `none` hides the AI and speech
-features while the reader still works. **OCR is out of scope.**
+On this branch the verdict has no feature to gate, so it becomes a visible
+library attribute instead: `poor` and `none` show a small badge on the book's
+cover in the grid, `good` and unknown show nothing. That is worth more here than
+it was before — a scanned PDF is now something you can see is a scan rather than
+something the assistant quietly refused to work on. **OCR is out of scope.**
 
 ### 7.3 The WebEngine bridge
 
@@ -739,8 +675,8 @@ Every bridge call gets a timeout and a defined failure mode; both sides log. The
 
 ### 7.4 Local LLM disappointment
 
-Unchanged. Per-task routing as configuration; clean degradation when services
-are absent.
+**Not a risk on this branch** — there is no model. Retained as a number so §7.5
+keeps its own.
 
 ### 7.5 Distribution reality
 
@@ -781,19 +717,23 @@ signal-slot boundary is undefined.
 
 ## 9. Scope
 
-**The port is done when the app reaches parity with the Rust build**, which is:
+**Parity, on this branch, is the Rust build minus everything in §5.4 to §5.8**:
 import through metadata and offline classification; library browse, filter,
 search, categories and tags; the reader for EPUB, PDF and converted MOBI;
-progress, completion and the reading queue; highlights and notes; TTS with
-autoplay; the AI panel with summaries, three Q&A scopes and library-wide Q&A;
-and the work policy.
+progress, completion and the reading queue; highlights and notes.
 
-**Still outstanding in the Rust build, and therefore not part of parity** —
-carried into TODO.md as the work that follows the port: MPRIS; online metadata
-providers; LLM auto-tagging; reader appearance settings; live text-scale
-following; manual tag and category editing; the voice picker; the explain-
-selection UI; a settings surface for the work policy; semantic ranking in the
-sidebar search; packaging and the AUR; backup layer 1.
+**Still outstanding**, carried over from the port: MPRIS is gone with the thing
+that would have published it; live text-scale following; reader appearance
+settings; online metadata providers; manual tag and category editing; packaging
+and the AUR; backup layer 1; and a handler for the bare file path that
+`Exec=omabook %f` passes.
 
 **Deferred, deliberately:** `omabook backup` layer 2; `omabook serve` and the
 PWA; OPDS and device sync; audiobooks; OCR.
+
+**Not coming back here.** The assistant, summaries, question answering, reading
+aloud and everything that talks to a model or a speech service live on
+`main-with-ai-features`. This branch is not a build flag or a runtime toggle —
+the code is gone, the dependencies are gone, and migration 006 has dropped the
+tables. If a feature here starts to want a network request, that is the moment
+to ask whether it belongs on the other branch instead.
