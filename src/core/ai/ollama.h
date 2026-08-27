@@ -18,6 +18,11 @@ public:
     // OLLAMA_EMBED_MODEL, each defaulting when unset.
     static Ollama fromEnv();
 
+    // The built-in defaults, exposed so the settings UI can show what it will
+    // fall back to without restating the literals and drifting from them.
+    static QString defaultChatModel();
+    static QString defaultEmbedModel();
+
     // The models this Ollama has pulled; empty when it is unreachable. The
     // settings picker offers only these -- naming a model that was never
     // pulled should fail at the moment of choosing, not at the first

@@ -2,10 +2,14 @@
 //
 // Preparing a book (or a whole library) for questions is long, stateful and
 // cancellable, so it runs on its own QThread rather than through
-// QtConcurrent (CLAUDE.md, "Threading", pattern 1). A fresh worker and
-// thread are created per run by AiController rather than kept alive for the
-// controller's whole life, mirroring the Rust original spawning a fresh
-// std::thread for each index_library()/index_book() call.
+// QtConcurrent (CLAUDE.md, "Threading", pattern 1). One worker is moved to
+// one thread for the life of the owning AiController -- like
+// TtsController/TtsWorker -- rather than a fresh QThread per run: a run's
+// database connection lives in a thread_local keyed by OS thread id
+// (Database::forCurrentThread()), and spinning up a brand new QThread per
+// job risks that id being recycled by the very next job before the
+// previous job's thread-local Database has torn down, racing two
+// connections under the same name.
 #pragma once
 
 #include <QObject>
@@ -33,11 +37,13 @@ public slots:
     // re-checked before each book (not once at the start) so unplugging
     // mid-run is respected; `backgroundEnabled`/`backgroundOnBattery` are
     // passed as primitives rather than a WorkPolicy struct so nothing here
-    // needs qRegisterMetaType (CLAUDE.md, "Threading").
+    // needs qRegisterMetaType (CLAUDE.md, "Threading"). Resets the cancel
+    // flag on entry, since this worker outlives any one run.
     void runLibrary(bool backgroundEnabled, bool backgroundOnBattery);
 
     // Prepare one book: chunk it, then embed it. No work-policy check --
     // this is always an explicit, interactive action, unlike runLibrary.
+    // Resets the cancel flag on entry, for the same reason as runLibrary.
     void runBook(qint64 bookId);
 
 signals:

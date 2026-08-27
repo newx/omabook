@@ -154,8 +154,14 @@ std::unique_ptr<Database> &threadInstance() {
 Database &Database::forCurrentThread(const QString &path) {
     std::unique_ptr<Database> &instance = threadInstance();
     if (!instance) {
-        const QString connectionName = QStringLiteral("omabook_%1")
-                                            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
+        // Named by a counter rather than by QThread::currentThreadId(). The
+        // OS recycles thread ids, so a short-lived worker's id can be handed
+        // to the next one while the first thread_local Database is still
+        // being torn down -- two connections briefly claiming one name, which
+        // deadlocks rather than failing. A counter cannot collide.
+        static QAtomicInteger<quint64> counter{0};
+        const QString connectionName =
+            QStringLiteral("omabook_%1").arg(counter.fetchAndAddOrdered(1));
         instance.reset(new Database(path, connectionName));
 
         // A thread_local is destroyed when its thread exits, and for the main

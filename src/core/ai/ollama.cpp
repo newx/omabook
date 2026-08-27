@@ -49,6 +49,10 @@ void waitForReply(QNetworkReply *reply) {
 Ollama::Ollama(const QString &baseUrl, const QString &chatModel, const QString &embedModel)
     : m_baseUrl(normaliseUrl(baseUrl)), m_chatModel(chatModel), m_embedModel(embedModel) { }
 
+QString Ollama::defaultChatModel() { return kDefaultChatModel; }
+
+QString Ollama::defaultEmbedModel() { return kDefaultEmbedModel; }
+
 Ollama Ollama::fromEnv() {
     return Ollama(envOr("OLLAMA_URL", kDefaultUrl), envOr("OLLAMA_CHAT_MODEL", kDefaultChatModel),
                   envOr("OLLAMA_EMBED_MODEL", kDefaultEmbedModel));

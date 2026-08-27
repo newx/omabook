@@ -16,7 +16,6 @@
 
 #include "core/ai/assistant.h"
 
-#include <functional>
 #include <optional>
 
 class QThread;
@@ -145,6 +144,13 @@ signals:
     void remoteModelChanged();
     void hasRemoteKeyChanged();
 
+    // Plumbing to the worker thread, not part of the QML-facing API above.
+    // A cross-thread signal-to-slot connection is the only channel to it
+    // (CLAUDE.md, "Threading") -- no shared mutable state. Both parameter
+    // lists are primitives, so neither needs qRegisterMetaType.
+    void requestIndexLibrary(bool backgroundEnabled, bool backgroundOnBattery);
+    void requestIndexBook(qint64 bookId);
+
 private slots:
     // Shared by summarizePage and askBook: both produce a Result<Answer>
     // and report it identically.
@@ -173,12 +179,6 @@ private:
     void setLocalModels(const QString &models);
     void setHasRemoteKey(bool present);
 
-    // Starts a fresh worker thread for one index run, wiring its signals to
-    // this controller. `kickoff` is called once the thread's event loop is
-    // running, on the worker thread, to invoke the right job with its
-    // arguments (CLAUDE.md, "Threading", pattern 1).
-    void startIndexRun(const std::function<void(IndexWorker *)> &kickoff);
-
     bool m_busy = false;
     QString m_status;
     QString m_answer;
@@ -206,14 +206,17 @@ private:
     QFutureWatcher<QString> *m_modelsWatcher = nullptr;
     QFutureWatcher<QString> *m_serviceWatcher = nullptr;
 
-    // A fresh worker/thread pair per index run (CLAUDE.md, "Threading",
-    // pattern 1) rather than one kept alive for this controller's whole
-    // life -- mirrors the Rust original spawning a fresh thread per call.
-    // Both are null whenever no run is in flight; written and read only on
-    // the GUI thread (set here, cleared in onIndexFinished()), so no
-    // synchronization is needed for the pointers themselves. cancelIndexing()
-    // still reaches across into the worker thread, but only to flip its
-    // std::atomic_bool, which is safe to write from any thread.
-    QThread *m_indexThread = nullptr;
-    IndexWorker *m_indexWorker = nullptr;
+    // One worker moved to one thread for this controller's whole life
+    // (CLAUDE.md, "Threading", pattern 1; matches TtsController/TtsWorker),
+    // rather than a fresh QThread per run: a run's database connection
+    // lives in a thread_local keyed by OS thread id
+    // (Database::forCurrentThread()), and a fresh QThread per job risks
+    // that id being recycled before the previous job's thread-local
+    // Database has torn down. Jobs are dispatched to it by the
+    // requestIndexLibrary/requestIndexBook signals below, the only channel
+    // to it; cancelIndexing() is the one exception, reaching directly into
+    // the worker to flip its std::atomic_bool, which is safe from any
+    // thread.
+    QThread *m_indexThread;
+    IndexWorker *m_indexWorker;
 };

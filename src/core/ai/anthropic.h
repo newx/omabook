@@ -22,6 +22,10 @@ public:
     // which is the normal case -- the remote provider is opt-in.
     static std::optional<Anthropic> fromEnv();
 
+    // The built-in default, exposed so the settings UI can show what it will
+    // fall back to without restating the literal and drifting from it.
+    static QString defaultModel();
+
     Result<QString> complete(const QString &prompt) override;
     bool available() override;
     ProviderClass providerClass() const override;

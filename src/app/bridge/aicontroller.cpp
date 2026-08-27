@@ -35,9 +35,6 @@ const QString SETTING_REMOTE_KEY = QStringLiteral("ai_remote_key");
 // to ollama.cpp/anthropic.cpp. These mirror the same literals and
 // environment variable names those two files already use, so a setting's
 // absence falls back to exactly what the provider itself would have chosen.
-const QString DEFAULT_LOCAL_CHAT_MODEL = QStringLiteral("llama3.2:3b");
-const QString DEFAULT_LOCAL_EMBED_MODEL = QStringLiteral("nomic-embed-text");
-const QString DEFAULT_REMOTE_MODEL = QStringLiteral("claude-opus-5");
 
 using LibraryAnswer = QPair<QList<qint64>, std::optional<Answer>>;
 
@@ -70,11 +67,11 @@ QString settingOrEnv(QSqlDatabase &db, const QString &key, const char *envVar, c
 }
 
 QString localModelName(QSqlDatabase &db) {
-    return settingOrEnv(db, SETTING_LOCAL_MODEL, "OLLAMA_CHAT_MODEL", DEFAULT_LOCAL_CHAT_MODEL);
+    return settingOrEnv(db, SETTING_LOCAL_MODEL, "OLLAMA_CHAT_MODEL", Ollama::defaultChatModel());
 }
 
 QString remoteModelName(QSqlDatabase &db) {
-    return settingOrEnv(db, SETTING_REMOTE_MODEL, "OMABOOK_REMOTE_MODEL", DEFAULT_REMOTE_MODEL);
+    return settingOrEnv(db, SETTING_REMOTE_MODEL, "OMABOOK_REMOTE_MODEL", Anthropic::defaultModel());
 }
 
 std::optional<QString> remoteKey(QSqlDatabase &db) {
@@ -95,7 +92,7 @@ std::optional<QString> remoteKey(QSqlDatabase &db) {
 // constructs one inside the thread that will actually make the request.
 Ollama localProvider(QSqlDatabase &db) {
     return Ollama(Ollama::fromEnv().baseUrl(), localModelName(db),
-                  envOr("OLLAMA_EMBED_MODEL", DEFAULT_LOCAL_EMBED_MODEL));
+                  envOr("OLLAMA_EMBED_MODEL", Ollama::defaultEmbedModel()));
 }
 
 // The remote provider, or nullopt when no key is configured -- which is the
@@ -188,19 +185,34 @@ AiController::AiController(QObject *parent) : QObject(parent) {
 
     m_serviceWatcher = new QFutureWatcher<QString>(this);
     connect(m_serviceWatcher, &QFutureWatcherBase::finished, this, &AiController::onServiceStarted);
+
+    // The indexing worker: one thread for this controller's whole life
+    // (CLAUDE.md, "Threading", pattern 1; matches TtsController/TtsWorker),
+    // not a fresh QThread per run -- see indexworker.h for why. Constructed
+    // with no parent, or moveToThread silently does nothing (CLAUDE.md,
+    // "Traps").
+    m_indexWorker = new IndexWorker;
+    m_indexThread = new QThread(this);
+    m_indexWorker->moveToThread(m_indexThread);
+
+    connect(this, &AiController::requestIndexLibrary, m_indexWorker, &IndexWorker::runLibrary);
+    connect(this, &AiController::requestIndexBook, m_indexWorker, &IndexWorker::runBook);
+    connect(m_indexWorker, &IndexWorker::statusChanged, this, &AiController::onIndexStatus);
+    connect(m_indexWorker, &IndexWorker::progressChanged, this, &AiController::onIndexProgress);
+    connect(m_indexWorker, &IndexWorker::finished, this, &AiController::onIndexFinished);
+    connect(m_indexThread, &QThread::finished, m_indexWorker, &QObject::deleteLater);
+    m_indexThread->start();
 }
 
 AiController::~AiController() {
-    // An index run may still be in flight when a screen closes. Ask it to
-    // stop and wait for it, rather than leaving a thread running past this
-    // object's lifetime (CLAUDE.md, "Threading"). Both pointers are null
-    // once a run has already finished on its own.
-    if (m_indexThread) {
-        if (m_indexWorker)
-            m_indexWorker->cancel();
-        m_indexThread->quit();
-        m_indexThread->wait();
-    }
+    // An index run may still be in flight when a screen closes: ask it to
+    // stop before waiting, or this could block on however much of the
+    // library was left to embed. Must stop the thread before QObject's own
+    // child cleanup deletes it -- deleting a running QThread warns and is
+    // unsafe (matches ~TtsController()).
+    m_indexWorker->cancel();
+    m_indexThread->quit();
+    m_indexThread->wait();
 }
 
 void AiController::summarizePage(const QString &text, const QString &book, const QString &chapter) {
@@ -295,11 +307,7 @@ void AiController::indexLibrary() {
     setIndexing(true);
     setStatus(QStringLiteral("indexing library…"));
 
-    const bool backgroundEnabled = m_backgroundEnabled;
-    const bool backgroundOnBattery = m_backgroundOnBattery;
-    startIndexRun([backgroundEnabled, backgroundOnBattery](IndexWorker *worker) {
-        worker->runLibrary(backgroundEnabled, backgroundOnBattery);
-    });
+    emit requestIndexLibrary(m_backgroundEnabled, m_backgroundOnBattery);
 }
 
 void AiController::indexBook(qint64 bookId) {
@@ -311,12 +319,11 @@ void AiController::indexBook(qint64 bookId) {
     setIndexTotal(0);
     setStatus(QStringLiteral("preparing…"));
 
-    startIndexRun([bookId](IndexWorker *worker) { worker->runBook(bookId); });
+    emit requestIndexBook(bookId);
 }
 
 void AiController::cancelIndexing() {
-    if (m_indexWorker)
-        m_indexWorker->cancel();
+    m_indexWorker->cancel();
     setStatus(QStringLiteral("stopping…"));
 }
 
@@ -348,12 +355,6 @@ void AiController::onIndexProgress(int done, int total) {
 void AiController::onIndexFinished(const QString &message) {
     setStatus(message);
     setIndexing(false);
-    // Both pointers refer to an object that has just asked to be deleted
-    // (deleteLater, still pending); nulling them here rather than waiting
-    // for the actual deletion is what keeps cancelIndexing() from ever
-    // reaching into a worker whose job is already done.
-    m_indexWorker = nullptr;
-    m_indexThread = nullptr;
 }
 
 void AiController::setBackgroundEnabled(bool enabled) {
@@ -609,21 +610,3 @@ void AiController::setHasRemoteKey(bool present) {
     emit hasRemoteKeyChanged();
 }
 
-void AiController::startIndexRun(const std::function<void(IndexWorker *)> &kickoff) {
-    // No parent, or moveToThread silently does nothing (CLAUDE.md, "Traps").
-    auto *worker = new IndexWorker;
-    auto *thread = new QThread;
-    m_indexWorker = worker;
-    m_indexThread = thread;
-    worker->moveToThread(thread);
-
-    connect(worker, &IndexWorker::statusChanged, this, &AiController::onIndexStatus);
-    connect(worker, &IndexWorker::progressChanged, this, &AiController::onIndexProgress);
-    connect(worker, &IndexWorker::finished, this, &AiController::onIndexFinished);
-    connect(worker, &IndexWorker::finished, thread, &QThread::quit);
-    connect(worker, &IndexWorker::finished, worker, &QObject::deleteLater);
-    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
-    connect(thread, &QThread::started, worker, [worker, kickoff]() { kickoff(worker); });
-
-    thread->start();
-}

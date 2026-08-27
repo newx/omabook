@@ -33,6 +33,8 @@ void waitForReply(QNetworkReply *reply) {
 
 Anthropic::Anthropic(const QString &apiKey, const QString &model) : m_apiKey(apiKey), m_model(model) { }
 
+QString Anthropic::defaultModel() { return kDefaultModel; }
+
 std::optional<Anthropic> Anthropic::fromEnv() {
     if (!qEnvironmentVariableIsSet("ANTHROPIC_API_KEY"))
         return std::nullopt;

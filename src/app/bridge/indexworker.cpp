@@ -15,6 +15,11 @@ void IndexWorker::cancel() {
 }
 
 void IndexWorker::runLibrary(bool backgroundEnabled, bool backgroundOnBattery) {
+    // This worker is reused across runs (one thread for the controller's
+    // whole life), so a previous run's cancellation must not silently
+    // no-op this one.
+    m_keepGoing.store(true, std::memory_order_relaxed);
+
     WorkPolicy policy;
     policy.backgroundEnabled = backgroundEnabled;
     policy.backgroundOnBattery = backgroundOnBattery;
@@ -86,6 +91,8 @@ void IndexWorker::runLibrary(bool backgroundEnabled, bool backgroundOnBattery) {
 }
 
 void IndexWorker::runBook(qint64 bookId) {
+    m_keepGoing.store(true, std::memory_order_relaxed);
+
     QSqlDatabase &db = Database::forCurrentThread().connection();
     Ollama embedder = Ollama::fromEnv();
 
