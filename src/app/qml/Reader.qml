@@ -53,8 +53,14 @@ Item {
         })()`, callback)
     }
 
+    /// The one URL the view is allowed to show in its main frame. Remembered
+    /// here rather than read back off the view, because the guard has to know
+    /// where the page was *sent* even while a navigation is in flight.
+    property string readerUrl: ""
+
     function load() {
-        view.url = library ? library.readerUrlFor(reader.bookId, reader.startCfi) : ""
+        reader.readerUrl = library ? library.readerUrlFor(reader.bookId, reader.startCfi) : ""
+        view.url = reader.readerUrl
     }
 
     // Paint saved highlights once the page says it is ready to be called into.
@@ -284,6 +290,56 @@ Item {
 
             onJavaScriptConsoleMessage: function(level, message, line, source) {
                 console.log("reader.js:" + line + " " + message)
+            }
+
+            // Navigation is an exfiltration path, and a book can drive it.
+            // foliate renders each chapter into an iframe from a blob: URL, so
+            // whatever script survives in a book runs inside this view; a
+            // chapter that sets `top.location` sends the app -- and anything
+            // it managed to read -- to an address of its choosing.
+            // `localContentCanAccessRemoteUrls: false` does not cover that: it
+            // stops fetch and XHR, not a navigation.
+            //
+            // So the view goes where this QML sent it and nowhere else. Local
+            // schemes for the subframes and resources foliate creates, and for
+            // the main frame the reader URL `load()` assigned, compared
+            // without its fragment because foliate moves through the book by
+            // pushing one.
+            readonly property var allowedSchemes: ["file", "blob", "qrc", "about", "data"]
+
+            function withoutFragment(url) {
+                var hash = url.indexOf("#")
+                return hash === -1 ? url : url.substring(0, hash)
+            }
+
+            onNavigationRequested: function(request) {
+                var target = request.url.toString()
+                var match = target.match(/^([A-Za-z][A-Za-z0-9+.-]*):/)
+                var scheme = match ? match[1].toLowerCase() : ""
+
+                var allowed = view.allowedSchemes.indexOf(scheme) !== -1
+                if (allowed && request.isMainFrame)
+                    allowed = view.withoutFragment(target)
+                              === view.withoutFragment(reader.readerUrl)
+
+                if (allowed)
+                    return
+
+                // Named, because a silently dropped navigation looks exactly
+                // like a book that simply does nothing when you click a link.
+                request.action = WebEngineNavigationRequest.IgnoreRequest
+                console.warn("reader: blocked navigation to " + target
+                             + (request.isMainFrame ? " (main frame)" : " (subframe)"))
+            }
+
+            // foliate hands an external link to window.open. There is no
+            // browser inside this app to give it to, and a book must not be
+            // able to raise a view the app does not control, so the request is
+            // logged and dropped rather than left to WebEngine's default.
+            onNewWindowRequested: function(request) {
+                console.warn("reader: blocked a new window for "
+                             + (request.requestedUrl ? request.requestedUrl.toString()
+                                                     : "an unnamed URL"))
             }
         }
 
