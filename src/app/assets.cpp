@@ -65,9 +65,16 @@ QString readerUrl(const QString &bookPath, const QString &cfi) {
     // neither may be interpolated raw: one space or ampersand truncates the
     // query string. QUrl::toPercentEncoding keeps exactly A-Za-z0-9-_.~
     // literal and hex-encodes every other byte, UTF-8 included.
+    //
+    // The path is made into a URL *before* it is encoded for the query, so
+    // that the page gets back a URL it can fetch rather than a path it has to
+    // turn into one. Concatenating "file://" onto the raw path instead left a
+    // '#' in a filename as a literal '#', and the fetch then stopped at it and
+    // asked for a file that does not exist. QUrl::fromLocalFile encodes it.
+    const QString bookUrl = QString::fromLatin1(QUrl::fromLocalFile(bookPath).toEncoded());
+
     QString url = QStringLiteral("file://%1/reader.html?file=%2")
-        .arg(dir, QString::fromLatin1(QUrl::toPercentEncoding(
-            QStringLiteral("file://") + bookPath)));
+        .arg(dir, QString::fromLatin1(QUrl::toPercentEncoding(bookUrl)));
 
     if (!cfi.isEmpty()) {
         url += QStringLiteral("&cfi=");

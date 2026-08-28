@@ -67,9 +67,14 @@ const message = (text) => {
 const toolbar = document.getElementById('sel-toolbar')
 
 const params = new URLSearchParams(location.search)
+// URLSearchParams has already percent-decoded these once, which is exactly
+// once: `file` is handed over as an encoded URL and comes back as one, ready
+// to fetch. Decoding it a second time was a bug -- a '%' in a filename made
+// decodeURIComponent throw URIError and no book opened at all, and a '#'
+// turned into a fragment that truncated the fetch.
 const bookUrl = params.get('file')
 const startCfi = params.get('cfi') || null
-const isPdf = bookUrl ? /\.pdf(\?|#|$)/i.test(decodeURIComponent(bookUrl)) : false
+const isPdf = bookUrl ? /\.pdf(\?|#|$)/i.test(bookUrl) : false
 
 // The text of what is actually on screen. The range from the relocate event is
 // the most accurate source — it is what foliate itself considers visible — and
@@ -477,7 +482,7 @@ const openBook = async () => {
   if (!bookUrl) { message('No book was given to open.'); return }
   message('Opening…')
   try {
-    const target = decodeURIComponent(bookUrl)
+    const target = bookUrl
     if (isPdf) await preparePdf()
 
     // One page at a time, however wide the window is. A fixed-layout book
