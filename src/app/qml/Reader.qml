@@ -53,10 +53,15 @@ Item {
         })()`, callback)
     }
 
-    /// The one URL the view is allowed to show in its main frame. Remembered
+    /// The one page the view is allowed to show in its main frame. Remembered
     /// here rather than read back off the view, because the guard has to know
     /// where the page was *sent* even while a navigation is in flight.
-    property string readerUrl: ""
+    ///
+    /// Typed `url` rather than `string` so that it goes through QUrl exactly
+    /// as the navigation the guard compares it against does. A raw
+    /// readerUrlFor() string does not: QUrl prints a URL back for humans, and
+    /// the two forms differ.
+    property url readerUrl
 
     function load() {
         reader.readerUrl = library ? library.readerUrlFor(reader.bookId, reader.startCfi) : ""
@@ -302,14 +307,35 @@ Item {
             //
             // So the view goes where this QML sent it and nowhere else. Local
             // schemes for the subframes and resources foliate creates, and for
-            // the main frame the reader URL `load()` assigned, compared
-            // without its fragment because foliate moves through the book by
-            // pushing one.
+            // the main frame the reader page `load()` assigned.
             readonly property var allowedSchemes: ["file", "blob", "qrc", "about", "data"]
 
-            function withoutFragment(url) {
+            // The page a URL names, without the query or the fragment.
+            //
+            // The main frame is pinned to that and not to the whole URL,
+            // because the rest of it does not survive a round trip through
+            // Chromium and back into a QUrl intact. The first attempt compared
+            // everything before the fragment, and QUrl printed the navigation
+            // back with its %20 decoded to a space while leaving the %2F in
+            // the same query encoded -- so the reader blocked its own opening
+            // load for every book whose filename contains a space, which on a
+            // real library is most of them. Comparing decoded paths has no
+            // such seam.
+            //
+            // What is given up is small: the query only names which book, and
+            // a main-frame navigation to this same local page carrying a
+            // different one is not an escape. It is still the app's own
+            // reader, it still cannot reach the network, and nothing leaves
+            // the machine.
+            function pageOf(url) {
+                var cut = url.length
+                var query = url.indexOf("?")
+                if (query !== -1)
+                    cut = query
                 var hash = url.indexOf("#")
-                return hash === -1 ? url : url.substring(0, hash)
+                if (hash !== -1 && hash < cut)
+                    cut = hash
+                return url.substring(0, cut)
             }
 
             onNavigationRequested: function(request) {
@@ -319,15 +345,14 @@ Item {
 
                 var allowed = view.allowedSchemes.indexOf(scheme) !== -1
                 if (allowed && request.isMainFrame)
-                    allowed = view.withoutFragment(target)
-                              === view.withoutFragment(reader.readerUrl)
+                    allowed = view.pageOf(target) === view.pageOf(reader.readerUrl.toString())
 
                 if (allowed)
                     return
 
                 // Named, because a silently dropped navigation looks exactly
                 // like a book that simply does nothing when you click a link.
-                request.action = WebEngineNavigationRequest.IgnoreRequest
+                request.reject()
                 console.warn("reader: blocked navigation to " + target
                              + (request.isMainFrame ? " (main frame)" : " (subframe)"))
             }
