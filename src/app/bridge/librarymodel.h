@@ -111,7 +111,12 @@ public:
     Q_INVOKABLE QString textQualityFor(qint64 bookId) const;
 
     // The reader page URL for a book, resuming where reading stopped.
-    Q_INVOKABLE QString readerUrlFor(qint64 bookId) const;
+    // `targetCfi` empty means "wherever I left off"; anything else is a
+    // deliberate destination -- a highlight or a note being opened from the
+    // Highlights view, which must land on the passage rather than on the
+    // reading position.
+    Q_INVOKABLE QString readerUrlFor(qint64 bookId,
+                                     const QString &targetCfi = QString()) const;
 
     // Import every book under `path`, on a worker thread. The window stays
     // responsive; busy and status_line report progress. A no-op while

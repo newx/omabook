@@ -15,9 +15,43 @@ Item {
     property var notes: null
     property int bookId: -1
     property string filePath: ""
+    /// Where to open. Empty means "wherever I left off"; set when a highlight
+    /// or note is opened from the Highlights view, so the book lands on that
+    /// passage instead of on the reading position.
+    property string startCfi: ""
+
+    /// Where the page actually settled, as opposed to where it was sent.
+    function landedCfi() {
+        return bridgeObject.last_cfi
+    }
+
+    /// How many highlight shapes foliate's overlayer has actually drawn in the
+    /// rendered document. Painting is best-effort -- a draw into a section
+    /// that has not rendered yet is swallowed and retried on create-overlay --
+    /// so counting the shapes is the only honest way to know it worked.
+    /// How many highlight shapes foliate has actually drawn, counted on the
+    /// overlayer rather than in the document: the overlayer's <svg> is
+    /// attached by the renderer and lives in neither the section's document
+    /// nor the top one.
+    ///
+    /// Always 0 for a fixed-layout book. foliate's FixedLayout renderer never
+    /// emits create-overlayer and its getContents() carries a literal
+    /// "TODO: index, overlayer", so a PDF's highlights are stored and can be
+    /// navigated to but cannot yet be painted (SPEC 5.3).
+    function countDrawnHighlights(callback) {
+        view.runJavaScript(`(() => {
+            const contents = view.renderer?.getContents?.() || []
+            let shapes = 0
+            for (const c of contents) {
+                const el = c?.overlayer?.element
+                if (el) shapes += el.children.length
+            }
+            return shapes
+        })()`, callback)
+    }
 
     function load() {
-        view.url = library ? library.readerUrlFor(reader.bookId) : ""
+        view.url = library ? library.readerUrlFor(reader.bookId, reader.startCfi) : ""
     }
 
     // Paint saved highlights once the page says it is ready to be called into.
@@ -45,6 +79,23 @@ Item {
         function onDarkChanged() {
             if (bridgeObject.connected) reader.applyAppearance()
         }
+    }
+
+    /// Asks the window to put the library back. The reader does not own its
+    /// own lifetime -- Main.qml loaded it and Main.qml unloads it.
+    signal closeRequested()
+
+    // Escape leaves the book, which is what every reader does and what the
+    // "← Library" button does with the mouse.
+    //
+    // Disabled while a dialog is up, because Popup.CloseOnEscape is already
+    // bound to that key: without the guard, one press would dismiss the note
+    // you were writing *and* throw you out of the book.
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.WindowShortcut
+        enabled: !noteDialog.opened
+        onActivated: reader.closeRequested()
     }
 
     NoteDialog {

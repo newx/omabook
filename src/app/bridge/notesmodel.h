@@ -64,6 +64,11 @@ public:
     // nothing on the page to anchor it to.
     Q_INVOKABLE QString annotationsJson(qint64 bookId) const;
 
+    // One annotation by id, as {"bookId": n, "cfi": "..."}; an empty map when
+    // there is no such note. The Highlights view already has the row in hand,
+    // so this exists for callers that have only an id.
+    Q_INVOKABLE QVariantMap noteById(qint64 id) const;
+
     // The date portion of an RFC3339 timestamp -- what CreatedAtRole shows.
     // Static so it is testable without a model or a database (CLAUDE.md,
     // "Pure logic goes in static member functions").

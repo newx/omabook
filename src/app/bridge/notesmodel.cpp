@@ -1,5 +1,7 @@
 #include "notesmodel.h"
 
+#include <QVariantMap>
+
 #include "core/db/database.h"
 
 #include <QJsonArray>
@@ -139,6 +141,21 @@ void NotesModel::remove(qint64 id) {
     if (removed.isErr())
         qWarning("could not delete note: %s", qUtf8Printable(removed.error().message));
     reload();
+}
+
+QVariantMap NotesModel::noteById(qint64 id) const {
+    NoteRepository repo(Database::forCurrentThread().connection());
+    const Result<QList<Note>> all = repo.all();
+    if (all.isErr())
+        return {};
+
+    for (const Note &note : all.value()) {
+        if (note.id != id)
+            continue;
+        return QVariantMap{{QStringLiteral("bookId"), note.bookId},
+                           {QStringLiteral("cfi"), note.cfi.value_or(QString())}};
+    }
+    return {};
 }
 
 QString NotesModel::annotationsJson(qint64 bookId) const {

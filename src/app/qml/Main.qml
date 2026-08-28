@@ -75,6 +75,15 @@ ApplicationWindow {
 
         if (Qt.application.arguments.indexOf("--probe-queue") !== -1) queueProbe.start()
 
+        // Open-note probe: take a stored annotation by id and open it exactly
+        // as the Highlights view does, so the reported landing CFI can be
+        // compared with the one that was asked for. This is the check that
+        // would have caught the reader opening every highlight at the last
+        // reading position.
+        var noteIdx = Qt.application.arguments.indexOf("--probe-open-note")
+        if (noteIdx !== -1 && noteIdx + 1 < Qt.application.arguments.length)
+            window.probeOpenNote(parseInt(Qt.application.arguments[noteIdx + 1]))
+
         if (Qt.application.arguments.indexOf("--headless-check") !== -1) {
             console.log("SLICE count:", library.count,
                         "| notes:", notesModel.count,
@@ -143,6 +152,50 @@ ApplicationWindow {
             window.probeDragBookId = -1   // the drop
             console.log("PROBE-QUEUE after: ", window.queueOrder())
             Qt.exit(0)
+        }
+    }
+
+    /// Opens one stored annotation the way NotesView does, and reports where
+    /// the reader actually landed against where it was told to go.
+    function probeOpenNote(noteId) {
+        var note = notesModel.noteById(noteId)
+        var target = note.cfi || ""
+        var book = note.bookId || 0
+        if (book <= 0 || target === "") {
+            console.log("PROBE-NOTE result: FAILED — no note", noteId)
+            Qt.exit(1)
+            return
+        }
+        console.log("PROBE-NOTE asked:", target)
+        readerLoader.open(book, target)
+        probeNoteReport.start()
+    }
+
+    Timer {
+        id: probeNoteReport
+        // Long enough for the page to open the book and settle on the target;
+        // a PDF section takes noticeably longer than a reflowable chapter.
+        interval: 6000
+        onTriggered: {
+            var landed = readerLoader.item ? readerLoader.item.landedCfi() : ""
+            console.log("PROBE-NOTE landed:", landed)
+            // Landing on the passage is only half of it: the highlight has to
+            // be painted there too, and a failed draw is swallowed by design
+            // so a section that has not rendered yet can be retried later.
+            // Count what foliate's overlayer actually drew.
+            if (readerLoader.item) {
+                readerLoader.item.countDrawnHighlights(function (drawn) {
+                    console.log("PROBE-NOTE drawn:", drawn)
+                    // Landing is the assertion; painting is reported but not
+                    // required, because foliate cannot paint into a
+                    // fixed-layout book at all and a PDF would fail forever.
+                    console.log("PROBE-NOTE result:", landed !== "" ? "OPENED" : "NO LOCATION")
+                    Qt.exit(landed !== "" ? 0 : 1)
+                })
+            } else {
+                console.log("PROBE-NOTE result: NO READER")
+                Qt.exit(1)
+            }
         }
     }
 
@@ -457,7 +510,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 visible: window.showingNotes
                 model: notesModel
-                onOpenBook: (bookId, cfi) => readerLoader.open(bookId)
+                onOpenBook: (bookId, cfi) => readerLoader.open(bookId, cfi)
             }
 
             // Built when first opened, and torn down when left, like the
@@ -492,8 +545,14 @@ ApplicationWindow {
         property int bookId: -1
         property string bookTitle: ""
 
-        function open(id) {
+        property string startCfi: ""
+
+        // `cfi` is optional: empty opens where the reader left off, and a
+        // highlight or note passes its own anchor so the book opens on the
+        // passage that was clicked.
+        function open(id, cfi) {
             bookId = id
+            startCfi = cfi || ""
             bookTitle = library.titleFor(id)
             source = "Reader.qml"
             active = true
@@ -509,6 +568,8 @@ ApplicationWindow {
             item.library = library
             item.notes = notesModel
             item.bookId = readerLoader.bookId
+            item.startCfi = readerLoader.startCfi
+            item.closeRequested.connect(readerLoader.close)
             item.load()
         }
     }

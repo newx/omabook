@@ -288,7 +288,7 @@ QString LibraryModel::textQualityFor(qint64 bookId) const {
     return toString(*quality);
 }
 
-QString LibraryModel::readerUrlFor(qint64 bookId) const {
+QString LibraryModel::readerUrlFor(qint64 bookId, const QString &targetCfi) const {
     QSqlDatabase &db = Database::forCurrentThread().connection();
     BookRepository repo(db);
 
@@ -296,8 +296,12 @@ QString LibraryModel::readerUrlFor(qint64 bookId) const {
     if (found.isErr() || !found.value().has_value())
         return QString();
 
-    const Result<std::optional<QString>> position = repo.progressPosition(bookId);
-    const QString cfi = (position.isOk() && position.value().has_value()) ? *position.value() : QString();
+    QString cfi = targetCfi;
+    if (cfi.isEmpty()) {
+        const Result<std::optional<QString>> position = repo.progressPosition(bookId);
+        if (position.isOk() && position.value().has_value())
+            cfi = *position.value();
+    }
 
     return Assets::readerUrl(found.value()->readablePath(), cfi);
 }
