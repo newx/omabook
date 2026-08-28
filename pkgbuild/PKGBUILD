@@ -27,11 +27,9 @@ depends=(
 
 makedepends=('qt6-base' 'git')
 
-# Everything the app can live without. The library, reader, search, highlights
-# and import all work with none of these installed.
-optdepends=(
-  'calibre: import MOBI and AZW3 books'
-)
+# Nothing. Calibre was here to convert MOBI and AZW3 into EPUB so the indexer
+# could read their text; with no indexer, and with foliate-js reading MOBI
+# directly, there is nothing left for it to do.
 
 # No source array: this builds the checkout it sits in, the way omawrite's
 # PKGBUILD does. Fetching a release tarball would be right for the AUR and
