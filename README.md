@@ -18,13 +18,27 @@ want those, they are on `main-with-ai-features`; see *Two branches* below.
 
 ## Install
 
-Not yet in the Omarchy Package Repository.
+Not yet in the Omarchy Package Repository, so it is built from source. Both
+paths fetch the reader engine and build it for you.
+
+**As a system package** — the Omarchy way, and what you want on Arch. Needs
+`sudo` for the final step, because that is `pacman` installing the package:
 
 ```bash
 git clone https://github.com/newx/omabook-cplus.git omabook
 cd omabook
-./bin/install
+./bin/install          # builds an Arch package and installs it
 ```
+
+**Into your home, with no root** — for another distribution, or a machine where
+you would rather not touch `/usr`:
+
+```bash
+./bin/install-local    # ~/.local/bin, ~/.local/share
+./bin/uninstall-local  # reverses it; your library is left alone
+```
+
+The two can coexist; the packaged install wins if both are present.
 
 Then press `SUPER + SPACE` and type **OmaBooks**, or run `omabook`. Double
 clicking an EPUB, MOBI or PDF opens it too.

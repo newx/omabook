@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+
+# Reverse bin/install-local.
+#
+# Your library, covers and settings are left alone -- they live in
+# {data}/omabook beside the reader, and losing them to an uninstall would be a
+# nasty surprise. Delete that directory by hand if you really mean it.
+
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+BIN_DIR="$HOME/.local/bin"
+APP_DIR="$DATA_HOME/applications"
+
+rm -f  "$BIN_DIR/omabook"
+rm -f  "$APP_DIR/omabook.desktop"
+rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/omabook.svg"
+rm -rf "$DATA_HOME/omabook/reader"
+
+command -v update-desktop-database >/dev/null 2>&1 &&
+  update-desktop-database -q "$APP_DIR" 2>/dev/null || true
+
+echo "Removed omabook. Your library is still at $DATA_HOME/omabook."

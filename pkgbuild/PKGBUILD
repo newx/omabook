@@ -30,35 +30,48 @@ makedepends=('qt6-base' 'git')
 # Everything the app can live without. The library, reader, search, highlights
 # and import all work with none of these installed.
 optdepends=(
-  'calibre: extract MOBI and AZW3 text for search and questions'
+  'calibre: import MOBI and AZW3 books'
 )
 
-source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+# No source array: this builds the checkout it sits in, the way omawrite's
+# PKGBUILD does. Fetching a release tarball would be right for the AUR and
+# wrong for `bin/install`, which is how anyone actually installs this today --
+# there is no tagged release to fetch.
+source=()
+sha256sums=()
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$startdir/.."
   ./bin/build
 }
 
 check() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$startdir/.."
   ./bin/test
 }
 
 package() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$startdir/.."
 
-  install -Dm755 build/omabook "$pkgdir/usr/bin/omabook"
-  install -Dm644 pkgbuild/omabook.desktop "$pkgdir/usr/share/applications/omabook.desktop"
-  install -Dm644 pkgbuild/omabook.svg \
+  /usr/bin/install -Dm755 build/omabook "$pkgdir/usr/bin/omabook"
+  /usr/bin/install -Dm644 pkgbuild/omabook.desktop \
+    "$pkgdir/usr/share/applications/omabook.desktop"
+  /usr/bin/install -Dm644 pkgbuild/omabook.svg \
     "$pkgdir/usr/share/icons/hicolor/scalable/apps/omabook.svg"
-  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  /usr/bin/install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 
   # The reader ships as data rather than embedded, so it can load book files
   # from disk: a qrc: page cannot.
-  install -dm755 "$pkgdir/usr/share/omabook"
+  /usr/bin/install -dm755 "$pkgdir/usr/share/omabook"
   cp -r assets/reader "$pkgdir/usr/share/omabook/reader"
+
+  # foliate-js arrives as a git clone rather than a vendored tree, so its
+  # history comes with it -- 3.6 MB, half the package, and of no use to anyone
+  # installing a book reader.
+  rm -rf "$pkgdir/usr/share/omabook/reader/foliate-js/.git" \
+         "$pkgdir/usr/share/omabook/reader/foliate-js/.github" \
+         "$pkgdir/usr/share/omabook/reader/foliate-js/node_modules"
+
   find "$pkgdir/usr/share/omabook" -type d -exec chmod 755 {} +
   find "$pkgdir/usr/share/omabook" -type f -exec chmod 644 {} +
 }

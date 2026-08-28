@@ -1,0 +1,69 @@
+#!/usr/bin/env sh
+set -eu
+
+# Install omabook for this user only, with no root and no package manager.
+#
+# The alternative, bin/install, builds an Arch package and installs it system
+# wide, which is the right thing on Omarchy. This is for everyone else: another
+# distribution, a machine where you would rather not touch /usr, or a build you
+# want to keep beside a packaged one.
+#
+# Assets::readerDir() already looks here -- {data}/reader is its third tier,
+# checked after /usr/share/omabook/reader -- so a local install and a packaged
+# one can coexist and the packaged one wins.
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+BIN_DIR="$HOME/.local/bin"
+APP_DIR="$DATA_HOME/applications"
+ICON_DIR="$DATA_HOME/icons/hicolor/scalable/apps"
+READER_DIR="$DATA_HOME/omabook/reader"
+
+# The reader engine is a separate project with its own history, so it is not
+# vendored. Without it omabook builds and the library works, but opening a book
+# renders nothing at all.
+if [ ! -f "$ROOT/assets/reader/foliate-js/view.js" ]; then
+  echo "Fetching the reader engine (foliate-js)..."
+  git clone --depth 1 https://github.com/johnfactotum/foliate-js.git \
+    "$ROOT/assets/reader/foliate-js"
+fi
+
+"$ROOT/bin/build"
+
+mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR" "$(dirname -- "$READER_DIR")"
+
+install -Dm755 "$ROOT/build/omabook" "$BIN_DIR/omabook"
+install -Dm644 "$ROOT/pkgbuild/omabook.svg" "$ICON_DIR/omabook.svg"
+
+# Replace the reader wholesale rather than merging: a file that foliate-js
+# deleted upstream would otherwise linger for ever.
+rm -rf "$READER_DIR"
+cp -r "$ROOT/assets/reader" "$READER_DIR"
+rm -rf "$READER_DIR/foliate-js/.git" "$READER_DIR/foliate-js/.github" \
+       "$READER_DIR/foliate-js/node_modules"
+
+# The packaged .desktop says `Exec=omabook`, which needs ~/.local/bin on PATH.
+# Here we know the absolute path, so use it and remove the doubt.
+sed "s|^Exec=omabook|Exec=$BIN_DIR/omabook|" \
+  "$ROOT/pkgbuild/omabook.desktop" > "$APP_DIR/omabook.desktop"
+chmod 644 "$APP_DIR/omabook.desktop"
+
+command -v update-desktop-database >/dev/null 2>&1 &&
+  update-desktop-database -q "$APP_DIR" 2>/dev/null || true
+command -v gtk-update-icon-cache >/dev/null 2>&1 &&
+  gtk-update-icon-cache -qtf "$DATA_HOME/icons/hicolor" 2>/dev/null || true
+
+echo
+echo "Installed:"
+echo "  $BIN_DIR/omabook"
+echo "  $READER_DIR"
+echo "  $APP_DIR/omabook.desktop"
+echo
+case ":$PATH:" in
+  *":$BIN_DIR:"*) echo "Run it with: omabook" ;;
+  *) echo "$BIN_DIR is not on your PATH. Run it with:"
+     echo "  $BIN_DIR/omabook"
+     echo "or add that directory to PATH." ;;
+esac
+echo "Remove it again with: bin/uninstall-local"
