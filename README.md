@@ -19,7 +19,7 @@ paths fetch the reader engine and build it for you.
 **As a system package** — the Omarchy way, and what you want on Arch:
 
 ```bash
-git clone https://github.com/newx/omabook-cplus.git omabook
+git clone https://github.com/newx/omabook.git
 cd omabook
 ./bin/install          # builds an Arch package and installs it
 ```
@@ -198,11 +198,11 @@ branch reads fine on the other.
 
 ## History
 
-A port of [omabook](https://github.com/newx/omabook) from Rust and cxx-qt to
-C++ and Qt 6, so that it is built the way [omawrite](https://github.com/omacom-io/omawrite)
-and the rest of the `oma*` family are — one `.pro`, one `make`, one binary. It
-reached parity with the Rust version, and then had its AI features removed on
-this branch.
+A port from Rust and cxx-qt to C++ and Qt 6, so that it is built the way
+[omawrite](https://github.com/omacom-io/omawrite) and the rest of the `oma*`
+family are — one `.pro`, one `make`, one binary. It reached parity with the
+Rust version, and then had its AI features removed. The Rust original is not
+published; it lives beside this one as `omabook-rust`.
 
 [SPEC.md](SPEC.md) says what it is meant to be and records what changed in the
 move; [TODO.md](TODO.md) tracks what is done and what is not.

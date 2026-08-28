@@ -9,7 +9,7 @@ and MOBI, with reading aloud and local AI. It was written in Rust with
 [cxx-qt](https://github.com/KDAB/cxx-qt) and is being reimplemented here in
 plain C++17 and Qt 6, so that it is built the same way as
 [omawrite](https://github.com/omacom-io/omawrite), the Omarchy Markdown editor.
-The Rust original lives at `~/Projects/omabook` and is the reference for
+The Rust original lives at `~/Projects/omabook-rust` and is the reference for
 behaviour; [SPEC.md](SPEC.md) is the reference for intent and
 [TODO.md](TODO.md) tracks the port.
 

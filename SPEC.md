@@ -3,14 +3,14 @@
 A personal book library and reader, in the spirit of Apple Books, built as a
 native Omarchy app in the idiom of `omawrite` and `omacalc`.
 
-**Status:** specification for a port, on the branch that removes the AI and
-speech features. A working Rust implementation exists at `~/Projects/omabook`;
-this document specifies the same product in C++17 and Qt 6, and records every
+**Status:** specification for a port, with the AI and speech features removed.
+A working Rust implementation exists at `~/Projects/omabook-rust`; this
+document specifies the same product in C++17 and Qt 6, and records every
 decision that changes in the move.
-**Branch:** `strip-ai-features`. The full application, with the assistant and
-reading aloud, is `main-with-ai-features`.
+**Branch:** `main`. The full application, with the assistant and reading
+aloud, is `main-with-ai-features`.
 **Date:** 2026-08-27
-**Location:** `~/Projects/omabook-cplus`
+**Location:** `~/Projects/omabook`
 
 Sections §5.4 to §5.8, §6.2 and §7.4 describe features this branch removes.
 They are kept as stubs rather than deleted so the numbering — which code
@@ -127,7 +127,7 @@ What is genuinely rewritten is the ~5,700 lines of Rust core logic and the
 **One repo, one `.pro`, one `make`, one installed binary.**
 
 ```
-omabook-cplus/
+omabook/
 ├── omabook.pro              # the only build target
 ├── CLAUDE.md  SPEC.md  TODO.md  README.md  LICENSE
 ├── bin/                     # build, test, install

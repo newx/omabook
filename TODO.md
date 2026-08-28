@@ -4,7 +4,7 @@ Derived from [SPEC.md](SPEC.md); conventions in [CLAUDE.md](CLAUDE.md). Section
 references (§) point into SPEC.md.
 
 **What this is.** A port of the working Rust implementation at
-`~/Projects/omabook` to C++17 and Qt 6, in omawrite's shape. The product does
+`~/Projects/omabook-rust` to C++17 and Qt 6, in omawrite's shape. The product does
 not change. Phases P1–P9 reach parity with the Rust build; the work after them
 is what the Rust build had not finished either.
 
@@ -366,7 +366,7 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
       probe combined with `--open` measures a screen the reader is covering
 - [ ] `bin/test` green; the ported tests cover what the Rust build's 75 covered
 - [ ] Open the real database written by the Rust build and read from it
-- [~] Side-by-side against `~/Projects/omabook`: the queue drag, the reader on
+- [~] Side-by-side against `~/Projects/omabook-rust`: the queue drag, the reader on
       EPUB and PDF, highlights and library Q&A all match. Still to compare:
       search, the three ask scopes, read page and auto read, theme switch
 - [ ] `qmllint` against the QML, and a run with no engine warnings
