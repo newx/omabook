@@ -167,6 +167,7 @@ document.addEventListener('keydown', turnPageOnKey)
 view.addEventListener('load', (e) => {
   const doc = e.detail?.doc
   currentIndex = e.detail?.index ?? currentIndex
+  schedulePaint()
   if (!doc) return
 
   const check = () => {
@@ -216,6 +217,7 @@ window.omabookSetAnnotations = (json) => {
     view.addAnnotation({ value: a.cfi, hasBody: a.hasBody })
       .catch(() => { /* section not rendered yet; create-overlay repaints */ })
   }
+  schedulePaint()
   return annotations.length
 }
 
@@ -223,6 +225,7 @@ window.omabookAddAnnotation = (cfi, hasBody) => {
   if (!cfi) return false
   annotations.push({ cfi, hasBody })
   view.addAnnotation({ value: cfi, hasBody }).catch(() => {})
+  schedulePaint()
   return true
 }
 
@@ -232,8 +235,113 @@ view.addEventListener('create-overlay', () => {
   }
 })
 
+// Painting highlights in a fixed-layout book -- a PDF, a fixed EPUB, a comic.
+//
+// foliate cannot do it. Its FixedLayout renderer never emits create-overlayer,
+// and getContents() there returns entries carrying a literal
+// "TODO: index, overlayer", so view.addAnnotation() silently finds no overlayer
+// and draws nothing. Highlights on a PDF were therefore stored, and could be
+// navigated to, and were invisible.
+//
+// So paint them here, from outside the vendored tree -- the same approach
+// js-polyfills.js takes for the Map methods pdf.js wants, and for the same
+// reason: a `git pull` of foliate-js must not quietly undo it. Delete all of
+// this once FixedLayout grows an overlayer of its own.
+const FIXED_OVERLAY_ID = 'omabook-fixed-overlay'
+
+// A paginated section always has an overlayer once it has rendered; a
+// fixed-layout one never does. That is the distinction, rather than sniffing
+// the renderer's class name.
+const isFixedLayout = () => {
+  const contents = view.renderer?.getContents?.() || []
+  return contents.length > 0 && contents.every(c => !c?.overlayer)
+}
+
+const paintFixedLayoutAnnotations = () => {
+  if (!isFixedLayout()) return 0
+
+  const contents = view.renderer?.getContents?.() || []
+  let drawn = 0
+
+  for (const { doc } of contents) {
+    if (!doc?.body) continue
+    doc.getElementById(FIXED_OVERLAY_ID)?.remove()
+
+    const svgNS = 'http://www.w3.org/2000/svg'
+    const svg = doc.createElementNS(svgNS, 'svg')
+    svg.id = FIXED_OVERLAY_ID
+    Object.assign(svg.style, {
+      position: 'absolute', top: '0', left: '0',
+      width: '100%', height: '100%',
+      pointerEvents: 'none', zIndex: '10',
+    })
+
+    for (const a of annotations) {
+      if (!a.cfi) continue
+
+      // resolveNavigation gives an anchor function, but not which of the
+      // spread's two iframes it belongs to -- that is the index FixedLayout
+      // does not report. Try it against this document and let an empty result
+      // say it belongs to the other one.
+      let range
+      try {
+        const resolved = view.resolveNavigation(a.cfi)
+        const anchor = resolved?.anchor
+        range = typeof anchor === 'function' ? anchor(doc) : anchor
+      } catch (e) {
+        continue
+      }
+
+      const rects = range?.getClientRects?.()
+      if (!rects || rects.length === 0) continue
+
+      const g = doc.createElementNS(svgNS, 'g')
+      g.setAttribute('fill', a.hasBody ? '#f5a623' : '#ffd54a')
+      g.style.opacity = '.3'
+      for (const { left, top, width, height } of rects) {
+        if (width <= 0 || height <= 0) continue
+        const rect = doc.createElementNS(svgNS, 'rect')
+        rect.setAttribute('x', left)
+        rect.setAttribute('y', top)
+        rect.setAttribute('width', width)
+        rect.setAttribute('height', height)
+        g.append(rect)
+      }
+      if (g.children.length === 0) continue
+      svg.append(g)
+      drawn++
+    }
+
+    if (svg.children.length > 0) doc.body.append(svg)
+  }
+
+  return drawn
+}
+
+// The rects are viewport coordinates, so they stop being true the moment the
+// page is re-laid out. A fixed-layout page does not scroll, but it does resize.
+// Always deferred, and coalesced. getClientRects() returns nothing until the
+// page has laid out, and on a fixed-layout book the first paint request
+// arrives at readerReady -- before the first page exists. Painting on the spot
+// there silently drew nothing, which is why a PDF's highlights stayed
+// invisible even once this code existed.
+let fixedPaintTimer = null
+const schedulePaint = () => {
+  if (fixedPaintTimer) clearTimeout(fixedPaintTimer)
+  fixedPaintTimer = setTimeout(() => {
+    fixedPaintTimer = null
+    paintFixedLayoutAnnotations()
+  }, 80)
+}
+
+window.addEventListener('resize', schedulePaint)
+
+
 view.addEventListener('relocate', (e) => {
   hideToolbar()
+  // A fixed-layout page turn swaps the iframe's document, taking the overlay
+  // with it, so it has to be drawn again for the page now showing.
+  schedulePaint()
   const d = e.detail || {}
   const cfi = d.cfi || ''
   const fraction = typeof d.fraction === 'number' ? d.fraction : 0
