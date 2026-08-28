@@ -17,6 +17,20 @@ QT += core-private
 
 CONFIG += c++17
 
+# Baked in so `omabook --version` can say which build you are actually running.
+# That is not idle curiosity: this application has existed as a Rust binary and
+# a C++ one under the same name, installed side by side, and telling them apart
+# by looking at a window is impossible. Empty when built from a tarball with no
+# git, which is fine.
+OMABOOK_VERSION = 0.1.0
+OMABOOK_REVISION = $$system(git -C $$PWD describe --always --dirty --tags 2>/dev/null)
+OMABOOK_BRANCH = $$system(git -C $$PWD rev-parse --abbrev-ref HEAD 2>/dev/null)
+isEmpty(OMABOOK_REVISION): OMABOOK_REVISION = unknown
+isEmpty(OMABOOK_BRANCH): OMABOOK_BRANCH = unknown
+DEFINES += OMABOOK_VERSION=\\\"$$OMABOOK_VERSION\\\"
+DEFINES += OMABOOK_REVISION=\\\"$$OMABOOK_REVISION\\\"
+DEFINES += OMABOOK_BRANCH=\\\"$$OMABOOK_BRANCH\\\"
+
 # Brute-force cosine over embedding vectors is the only hot loop in the app.
 # -O3 lets GCC vectorize it; no -march, because this ships as an Arch package
 # built for the plain x86-64 baseline.

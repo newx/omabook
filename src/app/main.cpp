@@ -6,6 +6,9 @@
 #include <QQmlContext>
 #include <QtWebEngineQuick>
 
+#include <cstdio>
+#include <cstring>
+
 #include "bridge/librarymodel.h"
 #include "bridge/notesmodel.h"
 #include "bridge/readerbridge.h"
@@ -16,7 +19,31 @@
 // existing `import com.omabook.app` lines still resolve.
 static const char *const QML_URI = "com.omabook.app";
 
+// Printed with printf rather than qInfo on purpose. Arch builds qt6-base with
+// journald support, so Qt routes every log category to the journal whenever
+// stderr is not a terminal -- a --version that answered into the system
+// journal would be a joke (CLAUDE.md, "Traps").
+static void printVersion() {
+    printf("omabook %s\n", OMABOOK_VERSION);
+    printf("  build   %s %s (C++ / Qt Quick)\n", OMABOOK_BRANCH, OMABOOK_REVISION);
+    // Both Qt versions, because QZipReader comes from Qt's private headers: a
+    // binary run against a Qt it was not built against may crash at any
+    // arbitrary point (SPEC 7.6). If these two disagree, rebuild before
+    // investigating anything else.
+    printf("  Qt      built against %s, running on %s\n", QT_VERSION_STR, qVersion());
+}
+
 int main(int argc, char *argv[]) {
+    // Answered before anything else, so it needs no display, no web engine and
+    // no database -- and so it still answers on a machine where the app itself
+    // cannot start.
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
+            printVersion();
+            return 0;
+        }
+    }
+
     // QtWebEngineQuick::initialize() must run before the application object is
     // constructed. An application controls its own main(), which is exactly the
     // requirement a Quickshell plugin could never satisfy (SPEC 2.2), and it is
