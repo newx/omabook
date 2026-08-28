@@ -21,6 +21,8 @@ Item {
     /// "good" | "poor" | "none" | "". Only the two bad cases are worth a
     /// badge; a book that reads fine has nothing to say about it (SPEC §7.2).
     property string textQuality: ""
+    /// Set by the grid when this card is the one keyboard navigation is on.
+    property bool focused: false
 
     signal opened()
     signal favoriteToggled()
@@ -32,8 +34,8 @@ Item {
         anchors.fill: parent
         radius: Theme.radius
         color: hover.hovered ? Theme.surfaceHover : Theme.surface
-        border.width: 1
-        border.color: Theme.cardBorder
+        border.width: card.focused ? 2 : 1
+        border.color: card.focused ? Theme.accent : Theme.cardBorder
         // Clips the sides and foot. It cannot round the cover's top corners on
         // its own: QML's `clip` is a rectangular scissor and ignores `radius`,
         // which is why the cover carries its own mask below.

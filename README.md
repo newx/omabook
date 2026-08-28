@@ -61,6 +61,22 @@ all stay uncategorised rather than guessed.
 Reading position, highlights and notes are saved as you go. Books move from
 unread to reading on first open, and to finished near the end.
 
+## Shortcuts
+
+The library is navigable without the mouse.
+
+- `s` focuses the sidebar. `↑`/`↓` move between its rows and `Enter` picks one.
+- `l` focuses the book grid. The arrow keys move between covers, and then
+  `o` or `Enter` opens a book, `f` favourites it, `q` puts it in the reading
+  queue, and `d` or `Delete` removes it — always behind a confirmation.
+- `Ctrl+F` focuses the search field.
+- `Escape` leaves the search field, and closes a book you are reading.
+
+Single-letter shortcuts do nothing while you are typing in the search field, so
+looking for *Shape Up* does not send you to the sidebar on the first keystroke.
+
+In a book, the arrow keys turn pages and `Escape` returns to the library.
+
 ## Requirements
 
 Qt 6 (`qt6-base`, `qt6-declarative`, `qt6-webengine`, `qt6-webchannel`,

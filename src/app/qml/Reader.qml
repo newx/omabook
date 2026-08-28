@@ -25,19 +25,13 @@ Item {
         return bridgeObject.last_cfi
     }
 
-    /// How many highlight shapes foliate's overlayer has actually drawn in the
-    /// rendered document. Painting is best-effort -- a draw into a section
-    /// that has not rendered yet is swallowed and retried on create-overlay --
-    /// so counting the shapes is the only honest way to know it worked.
-    /// How many highlight shapes foliate has actually drawn, counted on the
-    /// overlayer rather than in the document: the overlayer's <svg> is
-    /// attached by the renderer and lives in neither the section's document
-    /// nor the top one.
+    /// How many highlight shapes are actually painted, counted on the overlays
+    /// rather than in the document: foliate's own <svg> is attached by the
+    /// renderer and lives in neither the section's document nor the top one.
     ///
-    /// Always 0 for a fixed-layout book. foliate's FixedLayout renderer never
-    /// emits create-overlayer and its getContents() carries a literal
-    /// "TODO: index, overlayer", so a PDF's highlights are stored and can be
-    /// navigated to but cannot yet be painted (SPEC 5.3).
+    /// Counts two of them. foliate keeps one per rendered section, but only
+    /// for a reflowable book; a fixed-layout one gets no overlayer at all, so
+    /// reader.html paints its highlights into an overlay of its own.
     function countDrawnHighlights(callback) {
         view.runJavaScript(`(() => {
             const contents = view.renderer?.getContents?.() || []
@@ -45,6 +39,8 @@ Item {
             for (const c of contents) {
                 const el = c?.overlayer?.element
                 if (el) shapes += el.children.length
+                const own = c?.doc?.getElementById?.('omabook-fixed-overlay')
+                if (own) shapes += own.children.length
             }
             return shapes
         })()`, callback)

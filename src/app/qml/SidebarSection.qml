@@ -17,6 +17,11 @@ ColumnLayout {
     property bool expanded: true
     /// Optional component appended after the entries (used for Import).
     property Component extraRow: null
+    /// Keyboard focus, as a flat index into Sidebar's row list. `baseIndex` is
+    /// this section's offset into that list, so a row's global index is
+    /// `baseIndex + index` — see Sidebar.qml for how the list is assembled.
+    property int focusedIndex: -1
+    property int baseIndex: 0
 
     signal picked(string filter)
 
@@ -88,6 +93,7 @@ ColumnLayout {
 
         delegate: SidebarRow {
             required property var modelData
+            required property int index
             Layout.fillWidth: true
             indent: section.collapsible ? Theme.pad + 15 : Theme.pad
             label: modelData.name
@@ -95,6 +101,7 @@ ColumnLayout {
             count: modelData.count || 0
             note: modelData.note || ""
             selected: section.current === section.prefix + modelData.id
+            focused: section.focusedIndex === section.baseIndex + index
             onClicked: section.picked(section.prefix + modelData.id)
         }
     }

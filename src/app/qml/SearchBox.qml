@@ -13,6 +13,10 @@ Item {
 
     property string placeholder: "Search"
     property alias text: input.text
+    /// Whether the input itself holds keyboard focus — plain `field.activeFocus`
+    /// stays false here because `field` is not a FocusScope, so single-letter
+    /// shortcuts elsewhere have to ask the actual TextInput.
+    readonly property alias hasFocus: input.activeFocus
     /// The leading glyph. A magnifier for search, a question mark for Ask.
     property string glyph: "\u2315"
     /// Whether typing submits on its own. True for search, where the cost of a
@@ -29,6 +33,22 @@ Item {
     signal submitted(string query)
 
     height: 34
+
+    /// Driven by Main.qml's Ctrl+F: jump here and offer the existing text for
+    /// replacement, the way a browser's find field does.
+    function focusAndSelectAll() {
+        input.forceActiveFocus()
+        input.selectAll()
+    }
+
+    /// Clears the field's remembered focus within its enclosing FocusScope.
+    /// A FocusScope hands active focus straight back to whichever descendant
+    /// last held it — so once this field has been focused, Sidebar's own
+    /// `forceActiveFocus()` (for "s" / row navigation) would otherwise land
+    /// back here instead of on the scope itself. Called before that happens.
+    function blur() {
+        input.focus = false
+    }
 
     Rectangle {
         anchors.fill: parent

@@ -15,6 +15,10 @@ Item {
     property bool selected: false
     property bool dimmed: false
     property int indent: Theme.pad
+    /// Set by Sidebar when this row is the one keyboard navigation is on —
+    /// distinct from `selected`, which tracks the active filter and can be a
+    /// different row entirely.
+    property bool focused: false
 
     signal clicked()
 
@@ -27,6 +31,8 @@ Item {
         radius: 4
         color: row.selected ? Theme.selected
                             : hover.hovered ? Theme.surfaceHover : "transparent"
+        border.width: row.focused ? 1 : 0
+        border.color: Theme.accent
 
         HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: row.clicked() }

@@ -42,6 +42,80 @@ ApplicationWindow {
         notesModel.reload()
     }
 
+    function reloadSidebar() { sidebarData.reload() }
+
+    // Single-statement wrappers for the grid delegate's favourite/queue
+    // handlers below. A multi-statement `onFavoriteToggled: { ... }` block
+    // nested two components deep (GridView's required-property delegate,
+    // then the BookCard instance inside it) only resolves the *first*
+    // identifier it references from an outer scope; the qmlcachegen-compiled
+    // signal handler at that depth otherwise throws "X is not defined" on
+    // anything after the first statement. Root cause not fully chased down —
+    // it reproduces on unmodified HEAD too — but routing through one
+    // window-level call sidesteps it, since window's own top-level functions
+    // resolve `library` and `sidebarData` the normal way.
+    function toggleFavoriteAndRefreshSidebar(bookId) {
+        library.toggleFavorite(bookId)
+        reloadSidebar()
+    }
+
+    function toggleQueuedAndRefreshSidebar(bookId) {
+        library.toggleQueued(bookId)
+        reloadSidebar()
+    }
+
+    // Removing cannot be undone, and the delete button sits beside two that
+    // can — hence always through the confirm dialog, never straight away.
+    function requestDeleteBook(bookId, title) {
+        confirmDelete.pendingId = bookId
+        confirmDelete.ask(
+            "Remove “" + title + "”?",
+            "It leaves your library along with its reading position, highlights "
+            + "and notes. The file on disk is not deleted, so importing that "
+            + "folder again brings the book back.")
+    }
+
+    /// Escape from the sidebar or the grid: give up keyboard focus entirely
+    /// rather than hand it to some other specific control, and drop an active
+    /// search along with it. `focusSink` is an otherwise-inert Item that exists
+    /// only to be "nothing in particular" for focus to land on.
+    function clearLibraryFocus() {
+        if (library.search !== "") library.setSearchAndReload("")
+        sidebarView.searchField.text = ""
+        focusSink.forceActiveFocus()
+    }
+
+    // The library-wide single-letter shortcuts, guarded and factored into
+    // named functions rather than left inline on their Shortcut items: it
+    // gives --probe-keys the exact same guarded call to drive, instead of a
+    // second copy of the guard that could drift out of sync with the real one.
+    readonly property bool librarySafe: !readerLoader.active && !confirmDelete.opened
+    readonly property bool globalShortcutsAllowed: librarySafe && !sidebarView.searchField.hasFocus
+
+    /// "s": jump to the sidebar. Returns whether it actually fired, so a
+    /// probe can tell a swallowed key (search field focused) from a real one.
+    function pressS() {
+        if (!globalShortcutsAllowed) return false
+        sidebarView.focusFirst()
+        return true
+    }
+
+    /// "l": jump to the grid, always landing on the first book.
+    function pressL() {
+        if (!globalShortcutsAllowed) return false
+        grid.forceActiveFocus()
+        grid.currentIndex = grid.count > 0 ? 0 : -1
+        return true
+    }
+
+    /// Ctrl+F: no single-letter collision risk, so it only needs the dialog
+    /// and reader guard, not the search-field one.
+    function pressCtrlF() {
+        if (!librarySafe) return false
+        sidebarView.searchField.focusAndSelectAll()
+        return true
+    }
+
     Connections {
         target: library
         // The import runs off the UI thread; refresh the sidebar when it lands.
@@ -74,6 +148,8 @@ ApplicationWindow {
         }
 
         if (Qt.application.arguments.indexOf("--probe-queue") !== -1) queueProbe.start()
+
+        if (Qt.application.arguments.indexOf("--probe-keys") !== -1) probeKeysStart.start()
 
         // Open-note probe: take a stored annotation by id and open it exactly
         // as the Highlights view does, so the reported landing CFI can be
@@ -155,6 +231,123 @@ ApplicationWindow {
         }
     }
 
+    // Keyboard-navigation probe: drives the same guarded functions and
+    // GridView/Sidebar entry points the real key bindings call — not raw
+    // QKeyEvents, which QML has no way to synthesize without pulling in
+    // QtTest — and reports pass/fail per assertion so this is regression
+    // testable without a human at the keyboard.
+    property bool probeKeysOk: true
+    property int probeKeysFavCellIndex: -1
+    property bool probeKeysFavBefore: false
+
+    function probeAssert(name, condition, detail) {
+        console.log("PROBE-KEYS", name + ":", condition ? "PASS" : "FAIL",
+                    detail !== undefined ? detail : "")
+        if (!condition) window.probeKeysOk = false
+    }
+
+    function probeKeysRun() {
+        // A TextField with focus must swallow "s" rather than move focus —
+        // the most likely bug in the whole feature, so it goes first.
+        sidebarView.searchField.focusAndSelectAll()
+        probeAssert("search field takes focus", sidebarView.searchField.hasFocus === true)
+        var swallowed = window.pressS()
+        probeAssert("s is swallowed while the search field is focused", swallowed === false,
+                    "pressS() returned " + swallowed)
+        probeAssert("sidebar row focus untouched while typing",
+                    sidebarView.focusedIndex === -1, "focusedIndex=" + sidebarView.focusedIndex)
+
+        // Back to neutral, then "s" for real: it should focus the sidebar.
+        focusSink.forceActiveFocus()
+        probeAssert("search field released", sidebarView.searchField.hasFocus === false)
+        var focusedSidebar = window.pressS()
+        probeAssert("s focuses the sidebar",
+                    focusedSidebar === true && sidebarView.activeFocus === true,
+                    "pressS()=" + focusedSidebar + " sidebar.activeFocus=" + sidebarView.activeFocus)
+        probeAssert("s lands on the first row", sidebarView.focusedIndex === 0,
+                    "focusedIndex=" + sidebarView.focusedIndex)
+
+        // Down, then Return, changes the sidebar selection.
+        var beforeFilter = sidebarView.current
+        sidebarView.moveFocus(1)
+        probeAssert("down moves sidebar focus", sidebarView.focusedIndex === 1,
+                    "focusedIndex=" + sidebarView.focusedIndex)
+        sidebarView.activateFocused()
+        probeAssert("return activates the focused row",
+                    sidebarView.current === "favorites" && sidebarView.current !== beforeFilter,
+                    "current: " + beforeFilter + " -> " + sidebarView.current)
+        probeAssert("the activated filter reached the library",
+                    library.filter === "favorites", "library.filter=" + library.filter)
+
+        // Grid tests need every book on screen, not whatever "favorites" left.
+        sidebarView.pick("all")
+
+        // "l" focuses the grid, on its first book.
+        var focusedGrid = window.pressL()
+        probeAssert("l focuses the grid",
+                    focusedGrid === true && grid.activeFocus === true,
+                    "pressL()=" + focusedGrid + " grid.activeFocus=" + grid.activeFocus)
+        probeAssert("l lands on the first book", grid.currentIndex === 0,
+                    "currentIndex=" + grid.currentIndex)
+
+        // Right moves currentIndex by one, via GridView's own geometry —
+        // exactly what its built-in arrow-key handling calls internally.
+        var beforeIndex = grid.currentIndex
+        grid.moveCurrentIndexRight()
+        probeAssert("right moves grid focus by one", grid.currentIndex === beforeIndex + 1,
+                    beforeIndex + " -> " + grid.currentIndex)
+
+        // "f" flips favourite on the focused card — checked next tick, since
+        // the toggle round-trips through the library model.
+        var cell = grid.itemAtIndex(grid.currentIndex)
+        probeAssert("a focused card exists", !!cell, "currentIndex=" + grid.currentIndex)
+        if (cell) {
+            probeKeysFavCellIndex = grid.currentIndex
+            probeKeysFavBefore = cell.model.isFavorite
+            cell.card.favoriteToggled()
+        }
+
+        // TEMP: does 'd' actually reach the confirm dialog?
+        if (cell) {
+            cell.card.deleteRequested()
+            probeAssert("TEMP delete opens confirm dialog", confirmDelete.opened === true,
+                        "opened=" + confirmDelete.opened + " heading=" + confirmDelete.heading)
+            confirmDelete.close()
+        }
+    }
+
+    function probeKeysFinish() {
+        var cell = grid.itemAtIndex(probeKeysFavCellIndex)
+        if (cell) {
+            probeAssert("f flips the focused book's favourite state",
+                        cell.model.isFavorite !== probeKeysFavBefore,
+                        probeKeysFavBefore + " -> " + cell.model.isFavorite)
+            cell.card.favoriteToggled()   // leave the scratch library as found
+        } else {
+            probeAssert("f flips the focused book's favourite state", false,
+                        "card no longer at index " + probeKeysFavCellIndex)
+        }
+        console.log("PROBE-KEYS result:", window.probeKeysOk ? "ALL PASS" : "FAILED")
+        Qt.exit(window.probeKeysOk ? 0 : 1)
+    }
+
+    Timer {
+        id: probeKeysStart
+        // Long enough for the initial library load to populate the grid, so
+        // itemAtIndex has real delegates to hand back.
+        interval: 800
+        onTriggered: {
+            window.probeKeysRun()
+            probeKeysSettle.start()
+        }
+    }
+
+    Timer {
+        id: probeKeysSettle
+        interval: 200
+        onTriggered: window.probeKeysFinish()
+    }
+
     /// Opens one stored annotation the way NotesView does, and reports where
     /// the reader actually landed against where it was told to go.
     function probeOpenNote(noteId) {
@@ -227,6 +420,41 @@ ApplicationWindow {
             // FolderDialog yields a file:// URL; the importer wants a path.
             library.importDirectory(selectedFolder.toString().replace(/^file:\/\//, ""))
         }
+    }
+
+    // Exists only to receive focus: "nothing in particular" needs an actual
+    // item to give `forceActiveFocus()` to.
+    Item { id: focusSink }
+
+    // Library-wide keyboard navigation. Disabled outright while the reader is
+    // open — it has its own keys, and arrows there turn pages — and disabled
+    // while a modal dialog is up, so a shortcut cannot act on a book the
+    // dialog has already covered.
+    //
+    // "s" and "l" are plain letters, so unlike the grid's own key handling
+    // (which only ever sees a key when the grid itself has focus) these fire
+    // no matter what has focus. Typing "shape up" into the search field must
+    // not jump focus to the sidebar on the "s" — hence the explicit guard on
+    // the search field's own focus, not just the dialog's.
+    Shortcut {
+        sequence: "S"
+        context: Qt.WindowShortcut
+        enabled: window.globalShortcutsAllowed
+        onActivated: window.pressS()
+    }
+
+    Shortcut {
+        sequence: "L"
+        context: Qt.WindowShortcut
+        enabled: window.globalShortcutsAllowed
+        onActivated: window.pressL()
+    }
+
+    Shortcut {
+        sequence: "Ctrl+F"
+        context: Qt.WindowShortcut
+        enabled: window.librarySafe
+        onActivated: window.pressCtrlF()
     }
 
     // Header: taller, flat, separated by a single hairline. No toolbar
@@ -332,6 +560,7 @@ ApplicationWindow {
                 library.setSearchAndReload(query)
             }
             onImportRequested: folderDialog.open()
+            onEscaped: window.clearLibraryFocus()
         }
 
         Item {
@@ -369,6 +598,36 @@ ApplicationWindow {
                         // A card being dragged and the view being flicked are
                         // the same gesture; the view yields for the duration.
                         interactive: !window.queueDragging
+                        activeFocusOnTab: true
+
+                        // Left/Right/Up/Down move `currentIndex` for free —
+                        // GridView already walks its own geometry for that.
+                        // What is left to wire up is the actions on the
+                        // focused card, and giving up the current index back
+                        // to "nothing in particular" on Escape.
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Escape) {
+                                window.clearLibraryFocus()
+                                event.accepted = true
+                                return
+                            }
+                            var focusedCell = grid.itemAtIndex(grid.currentIndex)
+                            if (!focusedCell) return
+                            if (event.key === Qt.Key_O || event.key === Qt.Key_Return
+                                    || event.key === Qt.Key_Enter) {
+                                focusedCell.card.opened()
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_F) {
+                                focusedCell.card.favoriteToggled()
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_Q) {
+                                focusedCell.card.queueToggled()
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_D || event.key === Qt.Key_Delete) {
+                                focusedCell.card.deleteRequested()
+                                event.accepted = true
+                            }
+                        }
 
                         // Reordering moves rows rather than resetting the
                         // model, so the books left behind can slide into their
@@ -424,6 +683,7 @@ ApplicationWindow {
                                 queued: cell.model.isQueued
                                 queuePosition: window.showingQueue ? cell.index + 1 : 0
                                 textQuality: cell.model.textQuality
+                                focused: grid.activeFocus && cell.index === grid.currentIndex
 
                                 readonly property bool held:
                                     dragHandler.active || window.probeDragBookId === cell.model.bookId
@@ -461,25 +721,9 @@ ApplicationWindow {
                                 }
 
                                 onOpened: readerLoader.open(cell.model.bookId)
-                                onFavoriteToggled: {
-                                    library.toggleFavorite(cell.model.bookId)
-                                    sidebarData.reload()
-                                }
-                                onQueueToggled: {
-                                    library.toggleQueued(cell.model.bookId)
-                                    sidebarData.reload()
-                                }
-                                onDeleteRequested: {
-                                    // Removing cannot be undone, and the button
-                                    // sits beside two that can.
-                                    confirmDelete.pendingId = cell.model.bookId
-                                    confirmDelete.ask(
-                                        "Remove \u201c" + cell.model.title + "\u201d?",
-                                        "It leaves your library along with its reading "
-                                        + "position, highlights and notes. The file on "
-                                        + "disk is not deleted, so importing that folder "
-                                        + "again brings the book back.")
-                                }
+                                onFavoriteToggled: window.toggleFavoriteAndRefreshSidebar(cell.model.bookId)
+                                onQueueToggled: window.toggleQueuedAndRefreshSidebar(cell.model.bookId)
+                                onDeleteRequested: window.requestDeleteBook(cell.model.bookId, cell.model.title)
                             }
                         }
                     }
