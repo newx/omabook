@@ -19,6 +19,9 @@ FocusScope {
     /// which already handles its own Escape. Main.qml owns `library`, so it is
     /// the one that clears the active search.
     signal escaped()
+    /// Right arrow while a row has keyboard focus: Main.qml owns the grid, so
+    /// it is the one that moves focus there — same shape as `escaped()`.
+    signal rightPressed()
 
     /// The search field, exposed so Main.qml's global "s" / Ctrl+F bindings
     /// can gate on it and drive it without reaching past this component.
@@ -89,6 +92,23 @@ FocusScope {
         focusedIndex = rowCount > 0 ? 0 : -1
     }
 
+    /// Driven by the grid's Left arrow from its leftmost column: land back on
+    /// whichever row is already selected, rather than always the first — so
+    /// moving right and straight back left does not silently change which
+    /// filter is highlighted.
+    function focusSelected() {
+        searchBox.blur()
+        sidebar.forceActiveFocus()
+        var idx = -1
+        for (var i = 0; i < rowCount; i++) {
+            if (filterForIndex(i) === sidebar.current) {
+                idx = i
+                break
+            }
+        }
+        focusedIndex = idx >= 0 ? idx : (rowCount > 0 ? 0 : -1)
+    }
+
     /// Return/Enter on the focused row — exactly what clicking it does.
     function activateFocused() {
         if (focusedIndex === importIndex) {
@@ -116,6 +136,9 @@ FocusScope {
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             sidebar.activateFocused()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+            sidebar.rightPressed()
             event.accepted = true
         }
     }

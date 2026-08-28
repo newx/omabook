@@ -65,8 +65,11 @@ unread to reading on first open, and to finished near the end.
 
 The library is navigable without the mouse.
 
-- `s` focuses the sidebar. `↑`/`↓` move between its rows and `Enter` picks one.
-- `l` focuses the book grid. The arrow keys move between covers, and then
+- `s` focuses the sidebar. `↑`/`↓` move between its rows and `Enter` picks one;
+  `→` crosses to the books.
+- `l` focuses the book grid. The arrow keys move between covers, and `←` from
+  the leftmost column crosses back to the sidebar, landing on the row that is
+  already selected. Then
   `o` or `Enter` opens a book, `f` favourites it, `q` puts it in the reading
   queue, and `d` or `Delete` removes it — always behind a confirmation.
 - `Ctrl+F` focuses the search field.

@@ -176,6 +176,11 @@ QString NotesModel::annotationsJson(qint64 bookId) const {
         item.insert(QStringLiteral("id"), note.id);
         item.insert(QStringLiteral("cfi"), *note.cfi);
         item.insert(QStringLiteral("hasBody"), note.hasBody());
+        // The quote is the anchor of last resort, and in a fixed-layout book
+        // the only reliable one: pdf.js rebuilds its text layer on every
+        // render, so a CFI's structural path into it does not survive, while
+        // the words on the page do.
+        item.insert(QStringLiteral("quote"), note.quote.value_or(QString()));
         items.append(item);
     }
 

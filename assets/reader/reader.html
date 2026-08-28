@@ -257,6 +257,57 @@ const isFixedLayout = () => {
   return contents.length > 0 && contents.every(c => !c?.overlayer)
 }
 
+// Find a quote's range by its words rather than by its CFI.
+//
+// A CFI into a fixed-layout book does not survive. pdf.js rebuilds the text
+// layer on every render, so the structural path an epubcfi encodes -- "the
+// 30th child, offset 0" -- addresses whatever happens to be in that position
+// this time. Measured on a real library: of five highlights in one PDF, two
+// resolved to the wrong passage entirely and one to a range seven times the
+// length of the text it was made from. The EPUB CFIs alongside them were all
+// exact, because they carry element ids that survive a re-render.
+//
+// The words do survive, so anchor on them. Whitespace is normalised on both
+// sides, because a text layer breaks lines wherever the PDF did.
+const buildTextIndex = (doc) => {
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+  let text = ''
+  const map = []
+  let lastWasSpace = true
+  while (walker.nextNode()) {
+    const node = walker.currentNode
+    const value = node.nodeValue || ''
+    for (let i = 0; i < value.length; i++) {
+      const isSpace = /\s/.test(value[i])
+      if (isSpace && lastWasSpace) continue
+      text += isSpace ? ' ' : value[i]
+      map.push({ node, offset: i })
+      lastWasSpace = isSpace
+    }
+  }
+  return { text, map }
+}
+
+const rangeForQuote = (doc, quote) => {
+  const needle = (quote || '').replace(/\s+/g, ' ').trim()
+  // Too short to be sure of, and a false positive draws a highlight over
+  // something the reader never marked.
+  if (needle.length < 8 || !doc?.body) return null
+
+  const { text, map } = buildTextIndex(doc)
+  const at = text.indexOf(needle)
+  if (at === -1) return null
+
+  const first = map[at]
+  const last = map[at + needle.length - 1]
+  if (!first || !last) return null
+
+  const range = doc.createRange()
+  range.setStart(first.node, first.offset)
+  range.setEnd(last.node, last.offset + 1)
+  return range
+}
+
 const paintFixedLayoutAnnotations = () => {
   if (!isFixedLayout()) return 0
 
@@ -283,13 +334,18 @@ const paintFixedLayoutAnnotations = () => {
       // spread's two iframes it belongs to -- that is the index FixedLayout
       // does not report. Try it against this document and let an empty result
       // say it belongs to the other one.
-      let range
-      try {
-        const resolved = view.resolveNavigation(a.cfi)
-        const anchor = resolved?.anchor
-        range = typeof anchor === 'function' ? anchor(doc) : anchor
-      } catch (e) {
-        continue
+      let range = rangeForQuote(doc, a.quote)
+      if (!range) {
+        // No quote stored, or it is not on this page. Fall back to the CFI,
+        // which is right often enough to be worth trying and is all there is
+        // for an annotation saved before quotes were carried through.
+        try {
+          const resolved = view.resolveNavigation(a.cfi)
+          const anchor = resolved?.anchor
+          range = typeof anchor === 'function' ? anchor(doc) : anchor
+        } catch (e) {
+          continue
+        }
       }
 
       const rects = range?.getClientRects?.()
@@ -335,6 +391,8 @@ const schedulePaint = () => {
 }
 
 window.addEventListener('resize', schedulePaint)
+
+
 
 
 view.addEventListener('relocate', (e) => {

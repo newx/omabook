@@ -32,6 +32,13 @@ Item {
     /// Counts two of them. foliate keeps one per rendered section, but only
     /// for a reflowable book; a fixed-layout one gets no overlayer at all, so
     /// reader.html paints its highlights into an overlay of its own.
+    /// How many highlight shapes are actually painted, counted on the overlays
+    /// rather than in the document: foliate's own <svg> is attached by the
+    /// renderer and lives in neither the section's document nor the top one.
+    ///
+    /// Counts two of them. foliate keeps one per rendered section, but only
+    /// for a reflowable book; a fixed-layout one gets no overlayer at all, so
+    /// reader.html paints its highlights into an overlay of its own.
     function countDrawnHighlights(callback) {
         view.runJavaScript(`(() => {
             const contents = view.renderer?.getContents?.() || []

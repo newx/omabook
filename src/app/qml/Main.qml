@@ -108,6 +108,19 @@ ApplicationWindow {
         return true
     }
 
+    /// Left arrow's grid-to-sidebar hop, from the grid's own Keys.onPressed.
+    /// Returns whether it fired, so the caller knows whether to accept the
+    /// event or let GridView's own arrow handling move left by one. Columns
+    /// come from the view's real geometry (width / cellWidth), not a
+    /// hardcoded count, because the window is resizable and GridView
+    /// reflows; Math.max(1, ...) guards a zero or negative result.
+    function pressGridLeft() {
+        var columns = Math.max(1, Math.floor(grid.width / grid.cellWidth))
+        if (grid.currentIndex < 0 || grid.currentIndex % columns !== 0) return false
+        sidebarView.focusSelected()
+        return true
+    }
+
     /// Ctrl+F: no single-letter collision risk, so it only needs the dialog
     /// and reader guard, not the search-field one.
     function pressCtrlF() {
@@ -278,6 +291,38 @@ ApplicationWindow {
                     "current: " + beforeFilter + " -> " + sidebarView.current)
         probeAssert("the activated filter reached the library",
                     library.filter === "favorites", "library.filter=" + library.filter)
+
+        // Right from the sidebar hops to the grid, exactly like "l".
+        sidebarView.rightPressed()
+        probeAssert("right from the sidebar moves focus to the grid",
+                    grid.activeFocus === true && grid.currentIndex >= 0,
+                    "grid.activeFocus=" + grid.activeFocus + " currentIndex=" + grid.currentIndex)
+
+        // Left from the leftmost column (index 0) hops back to the sidebar,
+        // and must land on "favorites" — the row already selected above —
+        // not silently reset to the first row.
+        var leftFromEdge = window.pressGridLeft()
+        probeAssert("left from the leftmost column moves focus to the sidebar",
+                    leftFromEdge === true && sidebarView.activeFocus === true,
+                    "pressGridLeft()=" + leftFromEdge + " sidebar.activeFocus=" + sidebarView.activeFocus)
+        probeAssert("returning to the sidebar preserves the selected row",
+                    sidebarView.focusedIndex === 1 && sidebarView.current === "favorites",
+                    "focusedIndex=" + sidebarView.focusedIndex + " current=" + sidebarView.current)
+
+        // Back in the grid, one book right of the edge: Left there must only
+        // move one book, not leave the grid — the check that catches an
+        // over-eager implementation of the leftmost test.
+        window.pressL()
+        grid.moveCurrentIndexRight()
+        var beforeInteriorLeft = grid.currentIndex
+        var leftInterior = window.pressGridLeft()
+        probeAssert("left from a non-leftmost book stays in the grid",
+                    leftInterior === false && grid.activeFocus === true,
+                    "pressGridLeft()=" + leftInterior + " grid.activeFocus=" + grid.activeFocus)
+        grid.moveCurrentIndexLeft()
+        probeAssert("left from a non-leftmost book moves one book left",
+                    grid.currentIndex === beforeInteriorLeft - 1,
+                    beforeInteriorLeft + " -> " + grid.currentIndex)
 
         // Grid tests need every book on screen, not whatever "favorites" left.
         sidebarView.pick("all")
@@ -567,6 +612,7 @@ ApplicationWindow {
             }
             onImportRequested: folderDialog.open()
             onEscaped: window.clearLibraryFocus()
+            onRightPressed: window.pressL()
         }
 
         Item {
@@ -616,6 +662,16 @@ ApplicationWindow {
                                 window.clearLibraryFocus()
                                 event.accepted = true
                                 return
+                            }
+                            if (event.key === Qt.Key_Left) {
+                                if (window.pressGridLeft()) {
+                                    event.accepted = true
+                                    return
+                                }
+                                // Not the leftmost column: leave the event
+                                // un-accepted so GridView's own arrow
+                                // handling moves left by one, as it already
+                                // does for every other direction.
                             }
                             var focusedCell = grid.itemAtIndex(grid.currentIndex)
                             if (!focusedCell) return
