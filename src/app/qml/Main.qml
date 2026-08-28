@@ -307,12 +307,18 @@ ApplicationWindow {
             cell.card.favoriteToggled()
         }
 
-        // TEMP: does 'd' actually reach the confirm dialog?
-        if (cell) {
-            cell.card.deleteRequested()
-            probeAssert("TEMP delete opens confirm dialog", confirmDelete.opened === true,
+        // "d" never deletes outright — it must go through confirmDelete, same
+        // as the trash icon does. Refetch the delegate fresh rather than
+        // reusing `cell`: the favourite toggle above may have reset the model.
+        var deleteCell = grid.itemAtIndex(grid.currentIndex)
+        probeAssert("a card to delete-test exists", !!deleteCell,
+                    "currentIndex=" + grid.currentIndex)
+        if (deleteCell) {
+            deleteCell.card.deleteRequested()
+            probeAssert("d opens the confirm dialog rather than deleting outright",
+                        confirmDelete.opened === true,
                         "opened=" + confirmDelete.opened + " heading=" + confirmDelete.heading)
-            confirmDelete.close()
+            confirmDelete.close()   // decline — this is a check, not a real delete
         }
     }
 
