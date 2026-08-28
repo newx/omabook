@@ -53,6 +53,7 @@
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script type="module">
 import { makeBook } from './foliate-js/view.js'
+import { guardBook } from './sanitize.js'
 
 const view = document.getElementById('view')
 const messageEl = document.getElementById('message')
@@ -484,6 +485,12 @@ const openBook = async () => {
     // renderer settles that when it opens the book — so the book is made
     // here, and told, before it is handed over.
     const book = await makeBook(target)
+
+    // Before the book is opened, and so before anything in it is rendered:
+    // a chapter's own <script> would otherwise run same-origin with every
+    // file:// document on the machine (see sanitize.js).
+    guardBook(book)
+
     if (book.rendition?.layout === 'pre-paginated')
       book.rendition.spread = 'none'
     await view.open(book)
