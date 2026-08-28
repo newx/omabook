@@ -15,12 +15,21 @@
 #include <QString>
 #include <QTimer>
 
-// The handful of values the UI actually needs.
+// The whole palette the UI derives its tokens from (README "The mapping" /
+// Theme.qml). Defaults are Omarchy's own "solitude" dark theme, so a machine
+// with no Omarchy state directory still looks intentional rather than blank.
 struct OmarchyTheme {
     QString name = QStringLiteral("unknown");
     bool dark = true;                                   // is the theme itself dark
     QString accent = QStringLiteral("#798186");
+    QString background = QStringLiteral("#101315");
+    QString darkBackground = QStringLiteral("#0c0e10");
+    QString darkerBackground = QStringLiteral("#080a0b");
+    QString lighterBackground = QStringLiteral("#101315");
     QString foreground = QStringLiteral("#cacccc");
+    QString darkForeground = QStringLiteral("#4b4e55");
+    QString brightForeground = QStringLiteral("#a5aeb4");
+    QString selection = QStringLiteral("#343d41");
     QString muted = QStringLiteral("#4b4e55");
 
     bool operator==(const OmarchyTheme &other) const;

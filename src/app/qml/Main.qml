@@ -35,6 +35,12 @@ ApplicationWindow {
     // The Theme singleton holds the palette; the Rust model holds the choice.
     Binding { target: Theme; property: "dark";   value: themeModel.dark }
     Binding { target: Theme; property: "accent"; value: themeModel.accent }
+    Binding { target: Theme; property: "paletteBackground";      value: themeModel.background }
+    Binding { target: Theme; property: "paletteDarkBackground";  value: themeModel.dark_background }
+    Binding { target: Theme; property: "paletteDarkerBackground"; value: themeModel.darker_background }
+    Binding { target: Theme; property: "paletteSelection";       value: themeModel.selection }
+    Binding { target: Theme; property: "paletteForeground";      value: themeModel.foreground }
+    Binding { target: Theme; property: "muted";                  value: themeModel.muted }
 
     function refresh() {
         library.reload()

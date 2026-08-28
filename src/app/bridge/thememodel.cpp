@@ -16,14 +16,11 @@ bool ThemeModel::resolve(const QString &mode, bool systemDark) {
 }
 
 ThemeModel::ThemeModel(QObject *parent) : QObject(parent) {
-    const OmarchyTheme theme = Omarchy::current();
-    m_accent = theme.accent;
-    m_themeName = theme.name;
-    m_systemDark = theme.dark;
+    m_palette = Omarchy::current();
 
     SettingsRepository settings(Database::forCurrentThread().connection());
     m_mode = settings.getOr(SETTING_KEY, QStringLiteral("system"));
-    m_dark = resolve(m_mode, m_systemDark);
+    m_dark = resolve(m_mode, m_palette.dark);
 }
 
 void ThemeModel::cycleMode() {
@@ -41,7 +38,7 @@ void ThemeModel::applyMode(const QString &mode) {
     if (stored.isErr())
         qWarning("could not persist theme mode: %s", qUtf8Printable(stored.error().message));
 
-    const bool dark = resolve(mode, m_systemDark);
+    const bool dark = resolve(mode, m_palette.dark);
 
     if (m_mode != mode) {
         m_mode = mode;
@@ -70,20 +67,15 @@ void ThemeModel::refreshSystemTheme() {
     const OmarchyTheme theme = Omarchy::current();
     const bool dark = resolve(m_mode, theme.dark);
 
-    // Set only what actually moved. Every property write emits its changed
-    // signal, and Theme is bound into most of the UI, so an unconditional
-    // refresh would relayout the window each time the directory is touched --
-    // including for the background symlink, which is not a palette change at
-    // all.
-    if (m_themeName != theme.name) {
-        m_themeName = theme.name;
-        emit themeNameChanged();
+    // Compare the whole palette before touching anything. Every property
+    // write emits its changed signal, and Theme is bound into most of the UI,
+    // so an unconditional refresh would relayout the window each time the
+    // directory is touched -- including for the background symlink, which is
+    // not a palette change at all.
+    if (m_palette != theme) {
+        m_palette = theme;
+        emit paletteChanged();
     }
-    if (m_accent != theme.accent) {
-        m_accent = theme.accent;
-        emit accentChanged();
-    }
-    m_systemDark = theme.dark;
     if (m_dark != dark) {
         m_dark = dark;
         emit darkChanged();

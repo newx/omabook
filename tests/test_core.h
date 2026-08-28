@@ -208,6 +208,99 @@ private slots:
         QCOMPARE(theme.muted, QStringLiteral("#4b4e55"));
     }
 
+    // Omarchy's "solitude" theme, verbatim -- the full palette, not just the
+    // three keys the earlier tests happened to touch.
+    void parsesTheFullSolitudePaletteFromARealFile() {
+        QTemporaryDir home;
+        QVERIFY(home.isValid());
+        const QString state = home.filePath(QStringLiteral("current"));
+        QVERIFY(QDir().mkpath(state + QStringLiteral("/theme")));
+
+        QFile colors(state + QStringLiteral("/theme/colors.toml"));
+        QVERIFY(colors.open(QIODevice::WriteOnly | QIODevice::Text));
+        colors.write(
+            "mode = \"dark\"\n"
+            "accent = \"#798186\"\n"
+            "selection = \"#343d41\"\n"
+            "muted = \"#4b4e55\"\n"
+            "background = \"#101315\"\n"
+            "dark_background = \"#0c0e10\"\n"
+            "darker_background = \"#080a0b\"\n"
+            "lighter_background = \"#101315\"\n"
+            "foreground = \"#cacccc\"\n"
+            "dark_foreground = \"#4b4e55\"\n"
+            "bright_foreground = \"#a5aeb4\"\n");
+        colors.close();
+
+        const OmarchyTheme theme = Omarchy::readFrom(state);
+        QVERIFY(theme.dark);
+        QCOMPARE(theme.accent, QStringLiteral("#798186"));
+        QCOMPARE(theme.selection, QStringLiteral("#343d41"));
+        QCOMPARE(theme.muted, QStringLiteral("#4b4e55"));
+        QCOMPARE(theme.background, QStringLiteral("#101315"));
+        QCOMPARE(theme.darkBackground, QStringLiteral("#0c0e10"));
+        QCOMPARE(theme.darkerBackground, QStringLiteral("#080a0b"));
+        QCOMPARE(theme.lighterBackground, QStringLiteral("#101315"));
+        QCOMPARE(theme.foreground, QStringLiteral("#cacccc"));
+        QCOMPARE(theme.darkForeground, QStringLiteral("#4b4e55"));
+        QCOMPARE(theme.brightForeground, QStringLiteral("#a5aeb4"));
+    }
+
+    // A key the file never mentions must come back as the built-in default,
+    // not an empty string -- an empty QString is an invalid QML colour and
+    // would render as black no matter what the theme actually says.
+    void aMissingKeyFallsBackToItsDefaultNotAnEmptyString() {
+        QTemporaryDir home;
+        QVERIFY(home.isValid());
+        const QString state = home.filePath(QStringLiteral("current"));
+        QVERIFY(QDir().mkpath(state + QStringLiteral("/theme")));
+
+        QFile colors(state + QStringLiteral("/theme/colors.toml"));
+        QVERIFY(colors.open(QIODevice::WriteOnly | QIODevice::Text));
+        colors.write("mode = \"dark\"\naccent = \"#112233\"\n");
+        colors.close();
+
+        const OmarchyTheme theme = Omarchy::readFrom(state);
+        const OmarchyTheme defaults;
+        QCOMPARE(theme.accent, QStringLiteral("#112233"));
+        QCOMPARE(theme.background, defaults.background);
+        QCOMPARE(theme.darkBackground, defaults.darkBackground);
+        QCOMPARE(theme.darkerBackground, defaults.darkerBackground);
+        QCOMPARE(theme.lighterBackground, defaults.lighterBackground);
+        QCOMPARE(theme.foreground, defaults.foreground);
+        QCOMPARE(theme.darkForeground, defaults.darkForeground);
+        QCOMPARE(theme.brightForeground, defaults.brightForeground);
+        QCOMPARE(theme.selection, defaults.selection);
+        QCOMPARE(theme.muted, defaults.muted);
+        QVERIFY(!theme.background.isEmpty());
+    }
+
+    // No `mode` key at all: dark must be inferred from the background's
+    // luminance rather than assumed, in both directions.
+    void inferDarknessFromBackgroundLuminanceWhenModeIsAbsent() {
+        QTemporaryDir darkHome;
+        QVERIFY(darkHome.isValid());
+        const QString darkState = darkHome.filePath(QStringLiteral("current"));
+        QVERIFY(QDir().mkpath(darkState + QStringLiteral("/theme")));
+        QFile darkColors(darkState + QStringLiteral("/theme/colors.toml"));
+        QVERIFY(darkColors.open(QIODevice::WriteOnly | QIODevice::Text));
+        // Solitude's own background, and no `mode` line at all.
+        darkColors.write("background = \"#101315\"\n");
+        darkColors.close();
+        QVERIFY(Omarchy::readFrom(darkState).dark);
+
+        QTemporaryDir lightHome;
+        QVERIFY(lightHome.isValid());
+        const QString lightState = lightHome.filePath(QStringLiteral("current"));
+        QVERIFY(QDir().mkpath(lightState + QStringLiteral("/theme")));
+        QFile lightColors(lightState + QStringLiteral("/theme/colors.toml"));
+        QVERIFY(lightColors.open(QIODevice::WriteOnly | QIODevice::Text));
+        // catppuccin-latte's background.
+        lightColors.write("background = \"#eff1f5\"\n");
+        lightColors.close();
+        QVERIFY(!Omarchy::readFrom(lightState).dark);
+    }
+
     void aDesktopWithoutOmarchyStillYieldsUsableColours() {
         QTemporaryDir empty;
         QVERIFY(empty.isValid());

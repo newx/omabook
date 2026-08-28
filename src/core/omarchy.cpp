@@ -1,5 +1,6 @@
 #include "omarchy.h"
 
+#include <QColor>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -7,8 +8,28 @@
 
 bool OmarchyTheme::operator==(const OmarchyTheme &other) const {
     return name == other.name && dark == other.dark && accent == other.accent
-        && foreground == other.foreground && muted == other.muted;
+        && background == other.background && darkBackground == other.darkBackground
+        && darkerBackground == other.darkerBackground
+        && lighterBackground == other.lighterBackground && foreground == other.foreground
+        && darkForeground == other.darkForeground && brightForeground == other.brightForeground
+        && selection == other.selection && muted == other.muted;
 }
+
+namespace {
+
+// Standard perceived-luminance weighting. Used only when the theme file omits
+// `mode`, so a background colour still tells us whether the theme is dark.
+bool isDarkColour(const QString &hex) {
+    const QColor colour(hex);
+    if (!colour.isValid())
+        return true; // unparsable background: keep the safer dark guess
+
+    const double luminance =
+        0.299 * colour.redF() + 0.587 * colour.greenF() + 0.114 * colour.blueF();
+    return luminance < 0.5;
+}
+
+} // namespace
 
 namespace Omarchy {
 
@@ -70,13 +91,27 @@ OmarchyTheme readFrom(const QString &stateDirectory) {
     const QHash<QString, QString> values =
         parseSimpleToml(QString::fromUtf8(colorsFile.readAll()));
 
-    // A missing `mode` means dark: Omarchy's own default, and the safer guess
-    // for a palette we cannot classify.
+    theme.accent = values.value(QStringLiteral("accent"), theme.accent);
+    theme.background = values.value(QStringLiteral("background"), theme.background);
+    theme.darkBackground = values.value(QStringLiteral("dark_background"), theme.darkBackground);
+    theme.darkerBackground =
+        values.value(QStringLiteral("darker_background"), theme.darkerBackground);
+    theme.lighterBackground =
+        values.value(QStringLiteral("lighter_background"), theme.lighterBackground);
+    theme.foreground = values.value(QStringLiteral("foreground"), theme.foreground);
+    theme.darkForeground = values.value(QStringLiteral("dark_foreground"), theme.darkForeground);
+    theme.brightForeground =
+        values.value(QStringLiteral("bright_foreground"), theme.brightForeground);
+    theme.selection = values.value(QStringLiteral("selection"), theme.selection);
+    theme.muted = values.value(QStringLiteral("muted"), theme.muted);
+
+    // A missing `mode` is inferred from the background's luminance rather than
+    // assumed dark, so a hand-edited or unusual theme still classifies itself
+    // correctly instead of just defaulting.
     if (values.contains(QStringLiteral("mode")))
         theme.dark = values.value(QStringLiteral("mode")) != QStringLiteral("light");
-    theme.accent = values.value(QStringLiteral("accent"), theme.accent);
-    theme.foreground = values.value(QStringLiteral("foreground"), theme.foreground);
-    theme.muted = values.value(QStringLiteral("muted"), theme.muted);
+    else
+        theme.dark = isDarkColour(theme.background);
 
     return theme;
 }

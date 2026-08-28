@@ -9,36 +9,47 @@ import QtQuick
 QtObject {
     id: theme
 
-    // Set from Main.qml once the Rust ThemeModel exists.
+    // Set from Main.qml once ThemeModel exists. Defaults are Omarchy's own
+    // "solitude" dark theme, matching OmarchyTheme's C++ defaults, so this
+    // file still reads right when previewed standalone.
     property bool dark: true
     property color accent: "#798186"
 
-    // A near-black ground in dark mode, matching the terminal, rather than the
-    // theme's slightly-blue background.
-    readonly property color background: dark ? "#000000" : "#ffffff"
-    readonly property color text:       dark ? "#e6e6e6" : "#141414"
-    readonly property color muted:      dark ? "#8a8a8a" : "#5f5f5f"
+    // The raw Omarchy palette. Named apart from the tokens below because
+    // Omarchy's own names cannot be trusted at face value: `lighter_background`
+    // is measurably *darker* than `background` in both a light and a dark
+    // real-world theme, so it goes unused. What holds in both is the ramp
+    // darker_background < dark_background < background, and every token below
+    // is built on exactly that ramp and nothing else.
+    property color paletteBackground: "#101315"
+    property color paletteDarkBackground: "#0c0e10"
+    property color paletteDarkerBackground: "#080a0b"
+    property color paletteSelection: "#343d41"
+    property color paletteForeground: "#cacccc"
+    // `muted` needs no ramp position -- it maps straight across.
+    property color muted: "#4b4e55"
 
-    // Borders are a visible light grey, not a whisper — they are the only
-    // separation this design uses.
-    readonly property color border:     dark ? "#3a3a3a" : "#d0d0d0"
-    // Grid cards sit quieter than structural borders: thinner in feel, and
-    // closer to the background — but still far enough from it to draw an edge.
-    // The light value used to be #e6e6e6, which vanished against a white page
-    // and left every pale cover floating without a card around it. Both values
-    // now sit about the same distance from their own ground.
-    readonly property color cardBorder: dark ? "#242424" : "#d9d9d9"
-    readonly property color coverPlaceholder: dark ? "#0a0a0a" : "#efefef"
-    readonly property color surface:    dark ? "#0d0d0d" : "#f6f6f6"
-    readonly property color surfaceHover: dark ? "#171717" : "#ededed"
-    readonly property color selected:   dark ? "#1f1f1f" : "#e4e4e4"
+    // Deepest of the ramp: the page sits below every card.
+    readonly property color background: paletteDarkerBackground
+    readonly property color text:       paletteForeground
 
-    // An answer from the model gets its own ground: it is quoted material, and
-    // a card lifted off the page keeps it from reading as something the app is
-    // asserting. Lifted in the theme's own direction, though — a light card in
-    // a dark window was a hole punched in the page.
-    readonly property color answerSurface: dark ? "#1c1c1c" : "#eaeaea"
-    readonly property color answerText:    dark ? "#e6e6e6" : "#141414"
+    // Selection is used for both: a border is a thin selection-coloured line,
+    // and `selected` is the same colour filling a whole row/card.
+    readonly property color border:     paletteSelection
+    readonly property color selected:   paletteSelection
+    // Quieter than `border`: sits between the page and a card, one step short
+    // of the ramp's top.
+    readonly property color cardBorder: paletteDarkBackground
+    readonly property color coverPlaceholder: paletteDarkBackground
+
+    // Top of the ramp, so cards read as lifted off the page in dark themes
+    // and as bright panels in light ones.
+    readonly property color surface:    paletteBackground
+    // Must differ visibly from `surface`; nudged toward `text` rather than
+    // toward black or white, so hover reads the same direction the theme
+    // already leans.
+    readonly property color surfaceHover: dark ? Qt.lighter(surface, 200) : Qt.darker(surface, 110)
+
 
     /// Cover height as a share of card width. Roughly the proportions of a
     /// trade paperback, which suits most covers without cropping heavily.
