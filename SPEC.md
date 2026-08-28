@@ -168,9 +168,9 @@ system. The reader assets are **not** embedded — see §5.3.
 
 ### 2.6 Hardware
 
-Unchanged. Beelink SER9 Max (H255), Ryzen 7 255, 8c/16t, 58 GiB usable, iGPU
-only. Nothing on this branch is compute-bound: with no inference the machine is
-comfortably ahead of the work, and the heaviest thing import does is render a
+Developed on an eight-core desktop with integrated graphics and no discrete
+GPU. That mattered when there was inference to run; it does not now. Nothing on
+this branch is compute-bound, and the heaviest thing an import does is render a
 PDF cover.
 
 ---

@@ -391,11 +391,6 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [ ] **Backup layer 1 (§5.11)** — `VACUUM INTO` on clean exit and as a
       pre-backup hook; exclude patterns for thumbnails and extracted-text scratch;
       document how it composes with Omarchy's restic backup
-- [ ] **Log it in `~/omarchy-setup.md`** under *Applications*: what, where, why,
-      how to apply and verify, how to undo — package, desktop entry, mime
-      handler, any Hyprland window rule
-- [ ] **Track any hand-written config in `~/.dotfiles/`** with `install.sh` link
-      lines, and commit
 - [ ] `README.md`: install, run, restore
 
 ---
