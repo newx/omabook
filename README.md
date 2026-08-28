@@ -5,8 +5,8 @@ PDF, MOBI and AZW3, follows your system light/dark theme, and keeps your reading
 position, highlights and notes as you go.
 
 **This branch has no AI.** No assistant, no summaries, no question answering, no
-reading aloud, and nothing that talks to a model or a speech service — see
-*Two branches* below. It reaches the network for nothing at all: the books, the
+reading aloud, and nothing that talks to a model or a speech service - see
+*AI features branch* below. It reaches the network for nothing at all: the books, the
 database and the covers are local, and it behaves the same with the cable out.
 
 ![The library, a grid of book covers](docs/screenshots/library.jpg)
@@ -179,30 +179,20 @@ If the package is installed, note that `/usr/share/omabook/reader` takes
 precedence over the copy in your source tree, so a change to the reader needs a
 reinstall — or point `OMABOOK_READER_DIR` at the checkout.
 
-## Two branches
+## Branches
 
 `main-with-ai-features` is the full application: an assistant in the reader,
 questions answered from the whole library, page summaries, and reading aloud
 with automatic page turns.
 
-**This branch removes all of it**, and it is a real reduction rather than a
+**main branch removes all of it**, and it is a real reduction rather than a
 hidden switch. Around 4,200 lines of C++ and three QML screens are gone, along
 with the dependencies on `qt6-multimedia`, `qt6-multimedia-ffmpeg` and
 `qt6-speech`. Migration 006 drops the embedding and summary tables too, which on
 a fully indexed library took the database from 45 MB to 212 KB.
 
-That migration is one-way: a library opened here loses its embeddings, and
-re-indexing on the other branch costs roughly two minutes a book. Everything
-else is shared, so a book, a bookmark, a highlight or a note written on either
-branch reads fine on the other.
 
 ## History
-
-A port from Rust and cxx-qt to C++ and Qt 6, so that it is built the way
-[omawrite](https://github.com/omacom-io/omawrite) and the rest of the `oma*`
-family are — one `.pro`, one `make`, one binary. It reached parity with the
-Rust version, and then had its AI features removed. The Rust original is not
-published; it lives beside this one as `omabook-rust`.
 
 [SPEC.md](SPEC.md) says what it is meant to be and records what changed in the
 move; [TODO.md](TODO.md) tracks what is done and what is not.
@@ -214,7 +204,7 @@ the engine behind the Foliate reader, which covers EPUB, MOBI, AZW3, FB2, CBZ
 and PDF behind one API.
 
 The build and house style follow
-[omawrite](https://github.com/omacom-io/omawrite) by omacom-io.
+[omawrite](https://github.com/omacom-io/omawrite) by omacom-io / @dhh
 
 ## Author
 
