@@ -164,6 +164,7 @@ ApplicationWindow {
 
         if (Qt.application.arguments.indexOf("--probe-keys") !== -1) probeKeysStart.start()
 
+
         // Open-note probe: take a stored annotation by id and open it exactly
         // as the Highlights view does, so the reported landing CFI can be
         // compared with the one that was asked for. This is the check that

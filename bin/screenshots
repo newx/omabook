@@ -1,0 +1,54 @@
+#!/usr/bin/env sh
+set -eu
+
+# Regenerate the screenshots in docs/screenshots.
+#
+# The app cannot photograph itself: QQuickItem::grabToImage needs a window that
+# has actually rendered, so it fails under QT_QPA_PLATFORM=offscreen, which is
+# the only way to run without disturbing whoever is at the keyboard. So this
+# launches the real thing, crops the compositor's output to the window's own
+# geometry, and closes it again -- which does mean a window appears, briefly,
+# once per screen.
+#
+# Wayland and Hyprland only, for `grim` and for `hyprctl clients`.
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+OUT="$ROOT/docs/screenshots"
+
+for tool in grim hyprctl magick; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required." >&2; exit 1; }
+done
+
+mkdir -p "$OUT"
+
+shot() {
+  name="$1"; settle="$2"; shift 2
+  "$ROOT/build/omabook" "$@" >/dev/null 2>&1 &
+  app=$!
+  sleep "$settle"
+  geometry=$(hyprctl clients -j | python3 -c '
+import sys, json
+for c in json.load(sys.stdin):
+    if c.get("class") == "omabook":
+        x, y = c["at"]; w, h = c["size"]
+        print(f"{x},{y} {w}x{h}"); break
+')
+  if [ -n "$geometry" ]; then
+    grim -g "$geometry" "$OUT/$name.png"
+    magick "$OUT/$name.png" -quality 88 -strip "$OUT/$name.jpg"
+    rm -f "$OUT/$name.png"
+    echo "  $name.jpg"
+  else
+    echo "  $name: no window found" >&2
+  fi
+  kill "$app" 2>/dev/null || true
+  wait "$app" 2>/dev/null || true
+}
+
+echo "Capturing into $OUT"
+shot library        5 --show all
+shot reading-queue  5 --show queue
+shot highlights     5 --show notes
+shot settings       5 --show settings
+# The reader has a web engine to start and a book to lay out.
+shot reader        12 --open 3

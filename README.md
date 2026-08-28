@@ -9,6 +9,8 @@ reading aloud, and nothing that talks to a model or a speech service — see
 *Two branches* below. It reaches the network for nothing at all: the books, the
 database and the covers are local, and it behaves the same with the cable out.
 
+![The library, a grid of book covers](docs/screenshots/library.jpg)
+
 ## Install
 
 Not yet in the Omarchy Package Repository, so it is built from source. Both
@@ -108,6 +110,40 @@ looking for *Shape Up* does not send you to the sidebar on the first keystroke.
 
 In a book, `←`/`→`, `PageUp`/`PageDown` and `Space` turn pages, and `Escape`
 returns to the library.
+
+## Screens
+
+### Reading queue
+
+Drag a cover onto another to set the order. Each card carries its place, and
+the order is saved as you drop it.
+
+![The reading queue, each cover numbered with its place](docs/screenshots/reading-queue.jpg)
+
+### Highlights and notes
+
+Every highlight and note in the library, newest first, each one a way back into
+the passage it came from.
+
+![The highlights and notes page](docs/screenshots/highlights.jpg)
+
+### Reader
+
+foliate-js inside the window with the app's own chrome around it: page turns,
+progress, the chapter you are in, and the way back to the library. Highlights
+are painted over the text, in PDFs as well as EPUBs.
+
+![The reader, with a book open and a passage highlighted](docs/screenshots/reader.jpg)
+
+### Settings
+
+Where the library imports from. It is a short page, and deliberately so.
+
+![The settings page](docs/screenshots/settings.jpg)
+
+The images above are regenerated with `bin/screenshots`, which needs Wayland
+and Hyprland — it launches each screen and crops the compositor's output to the
+window.
 
 ## Requirements
 
