@@ -9,7 +9,7 @@ reading aloud, and nothing that talks to a model or a speech service - see
 *AI features branch* below. It reaches the network for nothing at all: the books, the
 database and the covers are local, and it behaves the same with the cable out.
 
-![The library, a grid of book covers](docs/screenshots/library.jpg)
+![The library, a grid of book covers](docs/screenshots/library.png)
 
 ## Install
 

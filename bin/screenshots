@@ -46,7 +46,11 @@ for c in json.load(sys.stdin):
 }
 
 echo "Capturing into $OUT"
-shot library        5 --show all
+# The opening image in the README is not in this list. It wants a wide window
+# showing five columns of covers, and this script gets whatever geometry the
+# window manager happens to tile the app into -- which was three columns and
+# very tall. So docs/screenshots/library.png is taken by hand, and left alone
+# by this script rather than being quietly replaced with a worse one.
 shot reading-queue  5 --show queue
 shot highlights     5 --show notes
 shot settings       5 --show settings
