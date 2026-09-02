@@ -361,8 +361,7 @@ private slots:
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         // Two levels deep on purpose: only the top level should name the
-        // category, matching the Rust reference's
-        // category_from_path() test.
+        // category.
         writeFile(dir.filePath(QStringLiteral("Fiction/scifi/dune.epub")), QByteArray(2048, 'x'));
 
         auto db = Database::openForTest();
@@ -451,8 +450,8 @@ private slots:
         QVERIFY2(foundTag, "expected the taggable subject to survive as a tag");
     }
 
-    // Not in the Rust suite: the port adds an explicit guarantee that one
-    // unreadable file cannot cost the user their whole import.
+    // An explicit guarantee that one unreadable file cannot cost the user
+    // their whole import.
     void aFailingBookDoesNotAbortTheRun() {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());

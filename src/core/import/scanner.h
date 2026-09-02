@@ -1,4 +1,4 @@
-// Directory scanning, ported from omabook-core/src/import/scanner.rs.
+// Directory scanning.
 #pragma once
 
 #include "core/models/book.h"

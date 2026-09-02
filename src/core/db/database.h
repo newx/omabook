@@ -1,5 +1,5 @@
-// Database connection and schema migration, ported from
-// omabook-core/src/db/mod.rs. Single responsibility: owning the connection
+// Database connection and schema migration. Single responsibility: owning the
+// connection
 // and keeping the schema at the expected version. Queries live in
 // src/core/repo, not here.
 #pragma once
@@ -13,7 +13,7 @@
 // XDG base directories, each with an "omabook" suffix. Deliberately built
 // from qEnvironmentVariable/QDir::homePath() rather than QStandardPaths, so
 // a test can fake $HOME (and $XDG_*_HOME) with qputenv and get a predictable
-// answer, and so the paths match the Rust build's byte for byte.
+// answer.
 namespace Db {
 
 QString dataDir();
@@ -46,7 +46,6 @@ public:
     // forCurrentThread() or with another openForTest() call, so tests that
     // run in the same thread (QtTest runs every slot on the main thread)
     // still get independent schemas. Defaults to an in-memory database.
-    // Mirrors Rust's separate `Database::open_in_memory()` constructor.
     static std::unique_ptr<Database> openForTest(const QString &path = QStringLiteral(":memory:"));
 
     ~Database();

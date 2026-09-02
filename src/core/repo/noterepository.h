@@ -1,4 +1,4 @@
-// Highlights and notes, ported from omabook-core/src/repo/notes.rs.
+// Highlights and notes.
 //
 // One table holds both. A highlight is a note with a quote and no body;
 // keeping them apart would mean duplicating the anchoring, the ordering, and

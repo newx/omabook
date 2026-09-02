@@ -1,6 +1,5 @@
-// The Book aggregate and its small enumerations, ported from
-// omabook-core/src/models/book.rs. Plain data types: no persistence, no I/O
-// -- see src/core/repo for those.
+// The Book aggregate and its small enumerations. Plain data types: no
+// persistence, no I/O -- see src/core/repo for those.
 #pragma once
 
 #include "core/result.h"
@@ -70,16 +69,15 @@ bool needsConversion(BookFormat format);
 // match). Returns nullopt for anything unrecognised.
 std::optional<BookFormat> bookFormatFromExtension(const QString &extension);
 
-// RFC3339 UTC, matching the Rust build's now_iso8601 -- used for
-// Book::addedAt and anywhere else a stored timestamp needs a fixed format.
+// RFC3339 UTC -- used for Book::addedAt and anywhere else a stored timestamp needs a fixed format.
 QString nowIso8601();
 
 // A book as stored. Identity is `id`; `fileHash` is what makes import
 // idempotent across re-scans.
 //
-// Several fields that are `Option<T>` in the Rust struct (subtitle,
-// readingPath, coverPath, description, categoryId) are flattened here to a
-// plain QString/qint64 with an empty-string/zero sentinel, since that is
+// Several optional fields (subtitle, readingPath, coverPath, description,
+// categoryId) are flattened to a plain QString/qint64 with an empty-string or
+// zero sentinel, since that is
 // how they round-trip through QSqlQuery::value() and QVariant in the repo
 // layer; textQuality keeps std::optional because "no quality assessed yet"
 // and "quality is none" are different states that must not collapse.

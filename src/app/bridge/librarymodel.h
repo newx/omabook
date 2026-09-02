@@ -1,8 +1,7 @@
 // LibraryModel -- the books, as a Qt list model.
 //
 // Its only job is translation: Book values become model roles. No queries
-// live here; those belong to BookRepository (SPEC §2.5). Ported from
-// omabook-app/src/bridge/library.rs.
+// live here; those belong to BookRepository (SPEC §2.5).
 #pragma once
 
 #include "core/models/book.h"
@@ -20,12 +19,10 @@ class ImportWorker;
 
 class LibraryModel : public QAbstractListModel {
     Q_OBJECT
-    // Snake case, and deliberately: the QML reads `library.status_line`,
-    // because cxx-qt never camelCased a multi-word qproperty and the ported
-    // QML carries those names byte-for-byte. The C++ accessors stay
-    // camelCase; only the QML-visible token differs (CLAUDE.md, "QML
-    // conventions"). Get this wrong and the binding reads `undefined` with
-    // no warning at any stage.
+    // Snake case, and deliberately: the QML reads `library.status_line`, and
+    // the QML is the contract. The C++ accessors stay camelCase; only the
+    // QML-visible token differs (CLAUDE.md, "QML conventions"). Get this wrong
+    // and the binding reads `undefined` with no warning at any stage.
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(QString status_line READ statusLine NOTIFY statusLineChanged)
     Q_PROPERTY(QString filter READ filter NOTIFY filterChanged)
@@ -37,9 +34,8 @@ class LibraryModel : public QAbstractListModel {
     Q_PROPERTY(QString library_folder READ libraryFolder NOTIFY libraryFolderChanged)
 
 public:
-    // Roles from Qt::UserRole (256), in this fixed order -- the Rust
-    // bridge's role module, ported verbatim so a role's numeric value never
-    // shifts under an existing delegate binding.
+    // Roles from Qt::UserRole (256), in this fixed order, so a role's numeric
+    // value never shifts under an existing delegate binding.
     enum Role {
         TitleRole = Qt::UserRole,
         AuthorRole,

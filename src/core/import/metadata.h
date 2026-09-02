@@ -1,5 +1,4 @@
-// The shared types every parser produces, ported from
-// omabook-core/src/import/metadata.rs. Written first, and kept exactly to
+// The shared types every parser produces. Written first, and kept exactly to
 // this shape, because the EPUB, MOBI and PDF parsers are all built against
 // it.
 #pragma once

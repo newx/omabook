@@ -1,8 +1,8 @@
-# C++ port spikes
+# Spikes
 
 Recorded 2026-08-27 on Omarchy, Qt 6.11.2, GCC on Arch. Each spike exists to
-settle a decision empirically rather than by argument, before any of the port
-is written on top of it.
+settle a decision empirically rather than by argument, before anything is
+written on top of it.
 
 ## qmake builds the whole module set — PASSED
 
@@ -21,7 +21,7 @@ the QML imports `QtWebEngine`, `QtTextToSpeech` and `QtMultimedia` at runtime.
 **Verdict: qmake, matching omawrite.** No second build system to learn, and the
 `.pro` stays a flat file list.
 
-## QSQLITE gives us everything the Rust build used rusqlite for — PASSED
+## QSQLITE gives us everything we need from SQLite — PASSED
 
 The worry was that Qt's bundled SQLite driver would be a cut-down build and
 force us to link `sqlite3` ourselves. It is not. Against the QSQLITE driver:
@@ -60,10 +60,9 @@ shipped once.
 
 ## WebEngine does not run headless
 
-Carried over from the Rust build's Phase 0 and still true: `QT_QPA_PLATFORM=offscreen`
-never loads a `WebEngineView`, and the run is silent rather than failing. Any
-reader verification has to happen on the real Wayland session, and the test
-binary must not depend on the reader.
+`QT_QPA_PLATFORM=offscreen` never loads a `WebEngineView`, and the run is
+silent rather than failing. Any reader verification has to happen on the real
+Wayland session, and the test binary must not depend on the reader.
 
 ## Qt logs to journald when there is no tty — and it is silent about it
 

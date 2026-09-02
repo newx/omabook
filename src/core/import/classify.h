@@ -1,5 +1,4 @@
-// Deciding a book's category without asking anyone, ported from
-// omabook-core/src/import/classify.rs.
+// Deciding a book's category without asking anyone.
 //
 // Categories used to come only from the folder a book was imported from,
 // which works for people who keep a sorted library and gives everyone else

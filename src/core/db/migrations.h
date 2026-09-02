@@ -1,5 +1,4 @@
 // Schema migrations, applied in order and tracked with `PRAGMA user_version`.
-// Ported from omabook-core/src/db/migrations.rs.
 //
 // Adding a migration means appending a new `.sql` file under
 // src/core/db/migrations/, registering it in migrations.qrc, and adding one

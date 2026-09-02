@@ -1,4 +1,4 @@
-// Reading and writing books, ported from omabook-core/src/repo/book_repo.rs.
+// Reading and writing books.
 #pragma once
 
 #include "core/models/book.h"
@@ -11,9 +11,9 @@
 
 // Which slice of the library to show. Mirrors the sidebar (SPEC §5.1).
 //
-// Rust spells this as an enum with data on two variants
-// (Category(i64)/Tag(i64)); a C++ enum cannot carry a payload, so this is a
-// small struct instead -- `id` is meaningful only for Category and Tag.
+// Two of the kinds need an id to go with them (Category and Tag) and the rest
+// do not. A C++ enum cannot carry a payload, so this is a small struct instead
+// -- `id` is meaningful only for those two.
 struct LibraryFilter {
     enum class Kind { All, Favorites, Reading, Queue, Completed, Category, Tag };
 
@@ -58,9 +58,8 @@ constexpr double COMPLETION_THRESHOLD = 0.98;
 
 // Reading and writing the books table and everything joined to it.
 //
-// Takes a QSqlDatabase & rather than owning one, mirroring the Rust type's
-// `&'a Connection`: a connection belongs to one thread (CLAUDE.md,
-// "Threading"), so this repository must never outlive the call that
+// Takes a QSqlDatabase & rather than owning one: a connection belongs to one
+// thread (CLAUDE.md, "Threading"), so this repository must never outlive the call that
 // constructed it, and must never copy the reference into a stored
 // QSqlDatabase.
 class BookRepository {

@@ -1,5 +1,4 @@
 // Small key/value settings, for things too minor to deserve a column.
-// Ported from omabook-core/src/repo/settings.rs.
 #pragma once
 
 #include "core/result.h"
@@ -17,8 +16,7 @@ public:
     Result<std::optional<QString>> get(const QString &key) const;
 
     // `defaultValue` on a missing key, and on a failed read -- a settings
-    // lookup that cannot fail the caller's flow, mirroring Rust's
-    // get_or's `.ok().flatten()`.
+    // lookup that cannot fail the caller's flow.
     QString getOr(const QString &key, const QString &defaultValue) const;
 
     Result<void> set(const QString &key, const QString &value);

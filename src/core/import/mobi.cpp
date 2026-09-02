@@ -43,8 +43,8 @@ std::optional<quint16> beU16(const QByteArray &bytes, qint64 at) {
 
 // 65001 is UTF-8; the only other value in the wild is 1252, which for the
 // titles and names that reach here is Latin-1 in all but a few glyphs. Each
-// byte maps directly to the code point of the same value -- not a real
-// cp1252 table -- matching the Rust reference's `b as char`.
+// byte maps directly to the code point of the same value, not through a real
+// cp1252 table.
 QString decodeText(const QByteArray &raw, quint32 encoding) {
     if (encoding == 65001)
         return QString::fromUtf8(raw);

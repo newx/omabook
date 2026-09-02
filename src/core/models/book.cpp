@@ -7,9 +7,9 @@
 
 namespace {
 
-// Rust's from_extension trims a single leading '.' before lowercasing;
-// QString::trimmed() trims whitespace, not punctuation, so that step is
-// spelled out here.
+// An extension arrives with or without its leading '.', which has to come off
+// before lowercasing; QString::trimmed() trims whitespace, not punctuation, so
+// that step is spelled out here.
 QString withoutLeadingDot(const QString &text) {
     if (text.startsWith(QLatin1Char('.')))
         return text.mid(1);

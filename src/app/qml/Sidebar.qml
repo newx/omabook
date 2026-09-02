@@ -7,7 +7,7 @@ import com.omabook.app
 FocusScope {
     id: sidebar
 
-    property var model: null          // the SidebarModel QObject from Rust
+    property var model: null          // the SidebarModel QObject
     property string current: "all"
     property bool busy: false
     property int noteCount: 0
@@ -61,7 +61,7 @@ FocusScope {
         sidebar.filterPicked(filter)
     }
 
-    // Categories and tags arrive as JSON (see sidebar.rs for why). Parsed
+    // Categories and tags arrive as JSON (see sidebarmodel.h for why). Parsed
     // defensively: a malformed payload must not take the sidebar down.
     function parseList(json) {
         try {

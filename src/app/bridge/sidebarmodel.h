@@ -1,5 +1,5 @@
 // SidebarModel -- the fixed views, plus the collapsible Categories and Tags
-// lists (SPEC §5.1). Ported from omabook-app/src/bridge/sidebar.rs.
+// lists (SPEC §5.1).
 //
 // Kept separate from LibraryModel so each has one reason to change: this
 // object answers "what can I filter by", the other "what am I looking at".
@@ -16,11 +16,10 @@
 
 class SidebarModel : public QObject {
     Q_OBJECT
-    // Snake case, and deliberately: the QML reads `sidebarData.count_all`
-    // and `sidebarData.categories_json`, because cxx-qt never camelCased a
-    // multi-word qproperty and the ported QML carries those names
-    // byte-for-byte (CLAUDE.md, "QML conventions"). The C++ accessors stay
-    // camelCase; only the QML-visible token differs.
+    // Snake case, and deliberately: the QML reads `sidebarData.count_all` and
+    // `sidebarData.categories_json`, and the QML is the contract (CLAUDE.md,
+    // "QML conventions"). The C++ accessors stay camelCase; only the
+    // QML-visible token differs.
     Q_PROPERTY(int count_all READ countAll NOTIFY countAllChanged)
     Q_PROPERTY(int count_favorites READ countFavorites NOTIFY countFavoritesChanged)
     Q_PROPERTY(int count_reading READ countReading NOTIFY countReadingChanged)

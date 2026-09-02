@@ -355,15 +355,14 @@ private slots:
         }
     }
 
-    // --- parity with the Rust build ---------------------------------
+    // --- against a real library ---------------------------------------
 
-    // The C++ port must read the library the Rust build wrote, unchanged.
-    // The five migrations came across byte-for-byte precisely so that this
-    // holds, and nothing else proves it as directly as opening the real file.
+    // A library already on disk has to keep opening as the schema moves, and
+    // nothing proves that as directly as opening the real file.
     //
     // Skips rather than fails when there is no library on this machine: a
     // test may not depend on a file outside the repository.
-    void opensADatabaseWrittenByTheRustBuild() {
+    void opensTheRealLibraryDatabase() {
         const QString source = QDir::homePath()
             + QStringLiteral("/.local/share/omabook/omabook.db");
         if (!QFileInfo::exists(source))
@@ -374,11 +373,11 @@ private slots:
         const QString copy = scratch.filePath(QStringLiteral("omabook.db"));
         QVERIFY2(QFile::copy(source, copy), "could not copy the library");
         // The copy is read-write; a snapshot without its -wal is still
-        // consistent because the Rust build checkpoints on a clean exit.
+        // consistent because the app checkpoints on a clean exit.
         QVERIFY(QFile::setPermissions(copy, QFile::ReadOwner | QFile::WriteOwner));
 
         auto db = Database::openForTest(copy);
-        QVERIFY2(db != nullptr, "the port could not open the Rust build's database");
+        QVERIFY2(db != nullptr, "could not open the library database");
 
         QSqlQuery version(db->connection());
         QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));

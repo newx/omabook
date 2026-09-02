@@ -1,6 +1,6 @@
 -- Vector storage for retrieval (SPEC §4.1).
 --
--- Plain BLOB columns and cosine similarity computed in Rust, rather than the
+-- Plain BLOB columns and cosine similarity computed in C++, rather than the
 -- sqlite-vec extension. Two reasons: sqlite-vec is still alpha, and at this
 -- scale an index buys nothing measurable. A personal library is hundreds of
 -- books; the two per-book scopes search a few thousand vectors and the

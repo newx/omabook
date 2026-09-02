@@ -17,8 +17,8 @@ Result<QString> hashFile(const QString &path) {
     // Eight little-endian bytes, spelled out by hand rather than through
     // QtEndian so the encoding is obvious at the call site: this is the
     // one place a truncated file's length is folded into its identity, and
-    // it must stay little-endian and eight bytes wide to match the Rust
-    // build's hashes bit for bit.
+    // it must stay little-endian and eight bytes wide, or every book already
+    // in a library is re-identified and imported again.
     quint64 length = static_cast<quint64>(len);
     char lengthBytes[8];
     for (int i = 0; i < 8; ++i) {

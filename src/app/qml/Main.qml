@@ -32,7 +32,7 @@ ApplicationWindow {
     /// row, because the rows move underneath it.
     property int probeDragBookId: -1
 
-    // The Theme singleton holds the palette; the Rust model holds the choice.
+    // The Theme singleton holds the palette; ThemeModel holds the choice.
     Binding { target: Theme; property: "dark";   value: themeModel.dark }
     Binding { target: Theme; property: "accent"; value: themeModel.accent }
     Binding { target: Theme; property: "paletteBackground";      value: themeModel.background }

@@ -16,20 +16,16 @@
 
 class ReaderBridge : public QObject {
     Q_OBJECT
-    // Every property below is exposed to QML under the exact identifier the
-    // already-ported Reader.qml reads (e.g. `bridgeObject.last_cfi`,
-    // `bridgeObject.pdf_page`). cxx-qt never camelCased multi-word
-    // qproperty names, so the original Rust build's QML read them as
-    // last_cfi/last_fraction/pdf_page, and that QML was carried across
-    // unchanged -- so the property tokens here have to match, even though
+    // Every property below is exposed to QML under the exact identifier
+    // Reader.qml reads (e.g. `bridgeObject.last_cfi`, `bridgeObject.pdf_page`).
+    // Those tokens are the contract, so they have to match here, even though
     // the C++ accessors below stay idiomatic (lastCfi(), pdfPage(), ...).
     Q_PROPERTY(QString last_cfi READ lastCfi NOTIFY lastCfiChanged)
     Q_PROPERTY(double last_fraction READ lastFraction NOTIFY lastFractionChanged)
     Q_PROPERTY(QString chapter READ chapter NOTIFY chapterChanged)
     // Not named `page`: a property named `page` would generate a
     // `pageChanged` notifier, colliding with the `pageChanged` invokable
-    // below in a way moc resolves ambiguously. This is why the Rust build
-    // named it pdf_page, and the constraint is identical in C++.
+    // below in a way moc resolves ambiguously. Hence pdf_page.
     Q_PROPERTY(int pdf_page READ pdfPage NOTIFY pdfPageChanged)
     // Non-empty means the book failed to open.
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)

@@ -21,7 +21,7 @@ public:
 
 public slots:
     // Import every book under `path`. Runs the whole pipeline linearly on
-    // this thread, exactly the shape of the Rust worker it replaces.
+    // this thread.
     void run(const QString &path);
 
 signals:

@@ -15,8 +15,7 @@
 namespace {
 
 // `$XDG_..._HOME` if it is set to an absolute path, else `~/<fallback>`,
-// with an "omabook" suffix in both cases -- matches
-// omabook-core/src/db/mod.rs's `base_dir`.
+// with an "omabook" suffix in both cases.
 QString baseDir(const char *envVar, const QString &fallbackRelative) {
     const QString override = qEnvironmentVariable(envVar);
     QString base = override;

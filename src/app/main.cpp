@@ -15,8 +15,7 @@
 #include "bridge/sidebarmodel.h"
 #include "bridge/thememodel.h"
 
-// The QML module the .qml files import. Kept from the Rust build so the
-// existing `import com.omabook.app` lines still resolve.
+// The QML module the .qml files import.
 static const char *const QML_URI = "com.omabook.app";
 
 // Printed with printf rather than qInfo on purpose. Arch builds qt6-base with
@@ -58,10 +57,9 @@ int main(int argc, char *argv[]) {
 
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
-    // The QML declares its own backend instances (`ThemeModel { id: themeModel }`),
-    // as the Rust build's module did. That is what lets each of these exist
-    // more than once with independent state (SPEC 5.13), which a context
-    // property could not do.
+    // The QML declares its own backend instances (`ThemeModel { id: themeModel }`).
+    // That is what lets each of these exist more than once with independent
+    // state (SPEC 5.13), which a context property could not do.
     qmlRegisterType<ThemeModel>(QML_URI, 1, 0, "ThemeModel");
     qmlRegisterType<LibraryModel>(QML_URI, 1, 0, "LibraryModel");
     qmlRegisterType<SidebarModel>(QML_URI, 1, 0, "SidebarModel");

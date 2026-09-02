@@ -18,12 +18,10 @@ class NotesModel : public QAbstractListModel {
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     // 0 lists every book's annotations; otherwise just this book's.
     //
-    // Exposed to QML as book_id, not the usual camelCase bookId: the
-    // already-ported QML (Main.qml: `notesModel.book_id = 0`) reads the
-    // Rust bridge's original qproperty identifier verbatim -- cxx-qt never
-    // camelCased multi-word property names, so neither does the QML that
-    // was carried across unchanged. The C++ accessors below stay idiomatic;
-    // only the property token QML sees has to match.
+    // Exposed to QML as book_id, not the usual camelCase bookId: the QML
+    // (Main.qml: `notesModel.book_id = 0`) reads that identifier, and the QML
+    // is the contract. The C++ accessors below stay idiomatic; only the
+    // property token QML sees has to match.
     Q_PROPERTY(qint64 book_id READ bookId WRITE setBookId NOTIFY bookIdChanged)
 
 public:

@@ -88,7 +88,7 @@ const visibleText = (detail) => {
     // A fixed-layout book has no range to give. Its renderer keeps both
     // halves of a spread in the DOM — and in portrait, one of them hidden —
     // so the first frame's text is as likely to be the facing page as this
-    // one. For a PDF that guess is unnecessary: Rust extracts the page by
+    // one. For a PDF that guess is unnecessary: C++ extracts the page by
     // number with pdftotext instead, which is always the page on screen.
     if (isPdf) return ''
     const contents = view.renderer?.getContents?.()
@@ -411,7 +411,7 @@ view.addEventListener('relocate', (e) => {
   const fraction = typeof d.fraction === 'number' ? d.fraction : 0
   const label = d.tocItem?.label || ''
   // Fixed-layout PDFs render to canvas and expose no text ranges, so the page
-  // number is what lets Rust extract the text with pdftotext instead. One
+  // number is what lets C++ extract the text with pdftotext instead. One
   // section is one page there, so the section index is the page. The reading
   // location is not: it is derived from section sizes (a PDF section counts
   // 1000 against 1500 units per location), so it drifts further from the page
@@ -420,9 +420,9 @@ view.addEventListener('relocate', (e) => {
   if (bridge) bridge.pageChanged(cfi, fraction, visibleText(d), label, page)
 })
 
-// Everything Rust may call is defined BEFORE readerReady() fires. The
+// Everything C++ may call is defined BEFORE readerReady() fires. The
 // QWebChannel handshake completes after page load, so calling in earlier
-// evaluates against undefined and fails silently (docs/phase-0-spikes.md).
+// evaluates against undefined and fails silently (docs/spikes.md).
 window.omabookNext = () => { view.next(); return true }
 window.omabookPrev = () => { view.prev(); return true }
 window.omabookGoTo = (target) => { view.goTo(target); return true }

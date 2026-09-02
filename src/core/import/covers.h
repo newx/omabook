@@ -1,6 +1,5 @@
-// Cover storage, ported from omabook-core/src/import/covers.rs. Covers
-// live outside the database, named by content hash, so that re-importing
-// the same book reuses the file rather than duplicating it.
+// Cover storage. Covers live outside the database, named by content hash, so
+// that re-importing the same book reuses the file rather than duplicating it.
 #pragma once
 
 #include "core/db/database.h"
@@ -13,9 +12,9 @@
 QString coversDir();
 
 // Write a cover and return its absolute path, thumbnailing it to fit
-// inside 320x480 on the way in -- the Rust build stored covers at their
-// original, sometimes print-resolution, size; nothing in the library grid
-// or the reader needs more than that. A no-op, returning the existing
+// inside 320x480 on the way in -- a cover arrives at its original, sometimes
+// print-resolution, size, and nothing in the library grid or the reader needs
+// more than that. A no-op, returning the existing
 // path, when a cover with this hash and extension already exists: the
 // file hash is already the book's identity, so nothing about its cover can
 // have changed underneath an unchanged hash.

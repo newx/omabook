@@ -17,8 +17,7 @@
 
 namespace {
 
-// A NewBook with just enough set to import, mirroring the Rust tests'
-// NewBook::new(...).with_authors(...) builder.
+// A NewBook with just enough set to import.
 NewBook makeBook(const QString &title, const QString &sourcePath, const QString &fileHash,
                   const QStringList &authors = {}) {
     NewBook book;
@@ -559,10 +558,9 @@ private:
         return repo.insert(makeBook(title, sourcePath, hash)).value();
     }
 
-    // A book with something hanging off every table that references it,
-    // mirroring the Rust delete_tests::furnished_book -- except the
-    // embedding row is inserted with raw SQL rather than through
-    // ai::VectorStore, which is a different subsystem's port.
+    // A book with something hanging off every table that references it. The
+    // embedding row is inserted with raw SQL rather than through the vector
+    // store, which is a different subsystem.
     static qint64 furnishedBook(Database &db) {
         BookRepository repo(db.connection());
         const qint64 id =

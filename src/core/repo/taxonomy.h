@@ -1,5 +1,4 @@
-// Categories (a tree, one per book) and tags (flat, many per book), ported
-// from omabook-core/src/repo/taxonomy.rs.
+// Categories (a tree, one per book) and tags (flat, many per book).
 #pragma once
 
 #include "core/result.h"

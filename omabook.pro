@@ -18,9 +18,9 @@ QT += core-private
 CONFIG += c++17
 
 # Baked in so `omabook --version` can say which build you are actually running.
-# That is not idle curiosity: this application has existed as a Rust binary and
-# a C++ one under the same name, installed side by side, and telling them apart
-# by looking at a window is impossible. Empty when built from a tarball with no
+# That is not idle curiosity: a packaged install and a ~/.local one can sit on
+# the same machine under the same name, and telling them apart by looking at a
+# window is impossible. Empty when built from a tarball with no
 # git, which is fine.
 OMABOOK_VERSION = 0.1.1
 OMABOOK_REVISION = $$system(git -C $$PWD describe --always --dirty --tags 2>/dev/null)

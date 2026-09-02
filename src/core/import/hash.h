@@ -1,6 +1,5 @@
-// Content hashing, ported from omabook-core/src/import/hash.rs. This hash
-// is the identity of a book (SPEC §5.2): moving or renaming a file and
-// rescanning must be a no-op, which is why identity comes from what the
+// Content hashing. This hash is the identity of a book (SPEC §5.2): moving or
+// renaming a file and rescanning must be a no-op, which is why identity comes from what the
 // file contains rather than where it sits.
 #pragma once
 

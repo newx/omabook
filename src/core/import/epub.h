@@ -1,4 +1,4 @@
-// EPUB metadata and text extraction, ported from omabook-core/src/import/epub.rs.
+// EPUB metadata and text extraction.
 //
 // An EPUB is a zip: META-INF/container.xml points at an OPF package document,
 // whose <metadata> carries Dublin Core fields and whose <manifest> names the

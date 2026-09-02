@@ -1,4 +1,4 @@
-// Metadata from MOBI and AZW3 files, ported from omabook-core/src/import/mobi.rs.
+// Metadata from MOBI and AZW3 files.
 //
 // Both are PalmDOC databases whose first record carries a MOBI header and,
 // behind it, an EXTH block: a flat list of typed records that is where the

@@ -1,5 +1,4 @@
-// Tests for the EPUB, MOBI and PDF parsers, ported from the Rust tests of
-// the same intent in omabook-core/src/import/{epub,mobi,pdf}.rs.
+// Tests for the EPUB, MOBI and PDF parsers.
 #pragma once
 
 #include <QtTest>
@@ -51,8 +50,7 @@ void overwrite(QByteArray &out, qsizetype at, const QByteArray &value) {
 
 // Builds the smallest MOBI file the parser accepts: a Palm header, two
 // record entries, and a record 0 carrying a MOBI header, a full title, and
-// the given EXTH records. Ported byte-for-byte from the Rust reference's
-// synthetic_mobi() test helper.
+// the given EXTH records.
 QByteArray synthesizeMobi(const QString &title, const QList<QPair<quint32, QString>> &exth) {
     const QByteArray titleBytes = title.toUtf8();
 

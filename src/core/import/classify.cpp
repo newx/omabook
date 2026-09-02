@@ -15,8 +15,7 @@ struct Shelf {
 // case-insensitive on whole words, in this order, first hit wins -- so the
 // specific shelves come before the broad ones they would otherwise fall
 // into ("Science Fiction" before "Fiction", "Mathematics" before
-// "Science"). Copied from the Rust SHELVES table in this exact order; the
-// order is the algorithm.
+// "Science"). The order is the algorithm.
 const QVector<Shelf> &shelves() {
     static const QVector<Shelf> table = {
         { QStringLiteral("Science Fiction"),

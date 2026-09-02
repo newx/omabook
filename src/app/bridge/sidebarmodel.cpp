@@ -11,8 +11,7 @@
 namespace {
 
 // [{"id":N,"name":"...","count":N}]. Built with QJsonDocument rather than
-// string concatenation -- the Rust build hand-rolled an escaper for this,
-// which QJsonDocument makes unnecessary.
+// string concatenation, which would need an escaper of its own.
 QString toJson(const QList<TaxonomyEntry> &entries) {
     QJsonArray items;
     for (const TaxonomyEntry &entry : entries) {

@@ -7,7 +7,7 @@ import com.omabook.app
 
 // The reader: QML chrome around a WebEngineView running foliate-js.
 // Rendering, pagination, CFI, and visible-text extraction live in the page;
-// everything else lives in Rust (SPEC §5.3).
+// everything else lives in C++ (SPEC §5.3).
 Item {
     id: reader
 

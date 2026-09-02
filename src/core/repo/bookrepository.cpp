@@ -56,7 +56,7 @@ QString orderClause(BookSort sort) {
 
 // The queue has its own hand-ordered sequence; any other sort would discard
 // the point of it (SPEC §5.9). This overrides whatever BookSort was asked
-// for, exactly as the Rust list() does.
+// for.
 QString effectiveOrder(const LibraryFilter &filter, BookSort sort) {
     if (filter.kind == LibraryFilter::Kind::Queue) {
         return QStringLiteral("(SELECT q.position FROM queue_items q "

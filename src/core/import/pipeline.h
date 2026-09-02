@@ -1,5 +1,5 @@
 // The import pipeline: Scan -> Hash -> Ingest -> ExtractText -> Classify ->
-// Tag (SPEC §5.2), ported from omabook-core/src/import/pipeline.rs.
+// Tag (SPEC §5.2).
 //
 // Each book is handled independently, so one unreadable file cannot abort
 // an import, and every step is idempotent: re-running over the same

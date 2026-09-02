@@ -4,9 +4,9 @@
 // whose `colors.toml` carries the palette every themed app on the system uses.
 // Following it is what makes omabook look like it belongs (SPEC 3.5).
 //
-// This lives in core rather than app -- unlike the Rust build, where it sat
-// beside main() -- because it is pure QtCore and because the watcher's
-// behaviour across a real theme swap is the one thing here worth a test.
+// This lives in core rather than app because it is pure QtCore, and because
+// the watcher's behaviour across a real theme swap is the one thing here worth
+// a test.
 #pragma once
 
 #include <QFileSystemWatcher>

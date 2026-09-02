@@ -1,5 +1,5 @@
-// One error type and one result type for the core, standing in for Rust's
-// `Result<T, E>`. Qt's event loop is not exception-safe (CLAUDE.md, "Error
+// One error type and one result type for the core. Qt's event loop is not
+// exception-safe (CLAUDE.md, "Error
 // handling"), so nothing here throws; every fallible core function returns
 // one of these instead and callers propagate with an early return.
 #pragma once
@@ -8,8 +8,7 @@
 #include <optional>
 #include <utility>
 
-// A single error type with a variant per failure source, mirroring the
-// Rust crate's `Error` enum (omabook-core/src/error.rs). `message` is
+// A single error type with a variant per failure source. `message` is
 // user-facing and written as a sentence, so it can be shown as-is.
 struct Error {
     // Decode is a stored value that is no longer meaningful -- an unknown
@@ -32,8 +31,8 @@ struct Error {
 };
 
 // Result<T>: either a value or an Error. Access value()/error() only after
-// checking isOk() -- like the Rust type, reading the wrong side is a bug in
-// the caller, not something this type recovers from at runtime.
+// checking isOk(): reading the wrong side is a bug in the caller, not
+// something this type recovers from at runtime.
 template <typename T>
 class Result {
 public:
@@ -60,7 +59,7 @@ private:
 };
 
 // Result<void>: for functions that are fallible but return nothing on
-// success, matching Rust's `Result<()>`.
+// success.
 template <>
 class Result<void> {
 public:
@@ -86,9 +85,8 @@ using VoidResult = Result<void>;
 
 // Propagates a Result<E>-returning expression out of the current function.
 // Relies on Result<T>'s implicit Error constructor, so the enclosing
-// function may return any Result<T> -- not just the same T as `expr` --
-// same as Rust's `?` operator threading one error type through functions
-// with different Ok types.
+// function may return any Result<T> -- not just the same T as `expr` -- so
+// one error type threads through functions with different Ok types.
 #define RETURN_IF_ERR(expr)                                                                     \
     do {                                                                                        \
         auto _result = (expr);                                                                  \

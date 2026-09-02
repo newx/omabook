@@ -44,8 +44,8 @@ Then press `SUPER + SPACE` and type **OmaBooks**, or run `omabook`. Double
 clicking an EPUB, MOBI or PDF opens it too.
 
 `omabook --version` reports the branch, the revision, and the Qt it was built
-against beside the Qt it is running on — worth having, because this application
-has also existed as a Rust binary under the same name.
+against beside the Qt it is running on — worth having when a packaged install
+and a `~/.local` one can sit on the same machine.
 
 ## Reading
 

@@ -195,9 +195,8 @@ TextQuality assessTextQuality(const QString &path) {
         return TextQuality::None_;
 
     // QString::size() counts UTF-16 code units rather than Unicode
-    // codepoints, unlike Rust's chars().count(); for the mostly-Latin text
-    // pdftotext produces the difference is immaterial to a threshold this
-    // coarse.
+    // codepoints; for the mostly-Latin text pdftotext produces the difference
+    // is immaterial to a threshold this coarse.
     qint64 totalChars = 0;
     for (const QString &text : texts)
         totalChars += text.trimmed().size();

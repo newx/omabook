@@ -53,8 +53,8 @@ QHash<QString, QString> parseSimpleToml(const QString &text) {
 
         QString value = line.mid(equals + 1).trimmed();
         // Quotes are stripped from either end rather than matched as a pair,
-        // because that is what the Rust trim_matches did and a half-quoted
-        // value in a hand-edited theme should still read as its contents.
+        // so a half-quoted value in a hand-edited theme still reads as its
+        // contents.
         while (value.size() >= 1
                 && (value.startsWith(QLatin1Char('"')) || value.startsWith(QLatin1Char('\''))))
             value = value.mid(1);

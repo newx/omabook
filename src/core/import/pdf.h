@@ -1,5 +1,4 @@
-// PDF metadata, cover, and text-quality assessment, via poppler's CLI
-// tools, ported from omabook-core/src/import/pdf.rs.
+// PDF metadata, cover, and text-quality assessment, via poppler's CLI tools.
 //
 // Shelling out rather than binding a PDF library is deliberate (SPEC §2.4):
 // poppler is battle-tested C++, already a dependency, and no PDF library is
