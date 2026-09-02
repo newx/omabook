@@ -1,20 +1,17 @@
-# omabook — Port TODO
+# omabook — TODO
 
 Derived from [SPEC.md](SPEC.md); conventions in [CLAUDE.md](CLAUDE.md). Section
 references (§) point into SPEC.md.
 
-**What this is.** A port of the working Rust implementation at
-`~/Projects/omabook-rust` to C++17 and Qt 6, in omawrite's shape. The product does
-not change. Phases P1–P9 reach parity with the Rust build; the work after them
-is what the Rust build had not finished either.
+**What this is.** The build-out of the app SPEC.md describes, subsystem by
+subsystem. Phases P1–P9 are the product itself; the work after them is what is
+left once it is whole.
 
-**How to work through it.** Bottom-up, subsystem by subsystem, with the Rust
-source open beside you. **A subsystem is done when its tests pass, not when it
-compiles.** The Rust core carries 75 tests and they are the acceptance criteria —
-each phase below names the ones it owes.
+**How to work through it.** Bottom-up, subsystem by subsystem. **A subsystem is
+done when its tests pass, not when it compiles** — each phase below names the
+tests it owes.
 
-**The largest risk (§7.1)** is not that the port fails but that behaviour is
-lost quietly: a threshold rounded, a fallback dropped, an ordering guarantee
+**The largest risk (§7.1)** is that behaviour is lost quietly: a threshold rounded, a fallback dropped, an ordering guarantee
 unnoticed. SPEC §5.13 lists the behaviours that look like details and are not.
 Read it before starting any phase.
 
@@ -57,7 +54,7 @@ dropped.
 
 - [x] Repo, `git init`, MIT licence, `.gitignore`, `docs/`
 - [x] `bin/build`, `bin/test`, `bin/install` in omawrite's shape
-- [x] Assets and `pkgbuild/` carried over from the Rust repo
+- [x] Assets and `pkgbuild/` in place
 - [x] **qmake carries the full module set on Qt 6.11.2** — `webenginequick`,
       `webchannel`, `multimedia`, `texttospeech`, `sql`, `quickdialogs2`,
       `concurrent`, `core-private` all configure, compile, link, and resolve
@@ -87,7 +84,7 @@ and it is the cheapest place to be wrong.
 - [x] **`src/core/result.h`** (§8) — `Error{Kind, message}` with
       `Io|Zip|Xml|Db|Net|Decode|Convert|Cancelled`, `Result<T>`, `Result<void>`
       and `RETURN_IF_ERR`. No exceptions
-- [x] **`src/core/db/database.{h,cpp}`** ← `db/mod.rs`
+- [x] **`src/core/db/database.{h,cpp}`**
   - [ ] `Database::forCurrentThread()` — named per-thread connections, the only
         sanctioned way to reach SQLite. Never store a `QSqlDatabase` in a member
   - [ ] `setConnectOptions("QSQLITE_BUSY_TIMEOUT=5000")` before `open()`, then
@@ -96,21 +93,20 @@ and it is the cheapest place to be wrong.
         `~/.config`, `~/.cache` fallbacks
   - [ ] chmod 0600 on the db file and its `-wal` / `-shm` siblings
   - [ ] `vacuumInto(path)` — removes an existing target first (§5.11)
-- [x] **`src/core/db/migrations.{h,cpp}`** ← `db/migrations.rs`
+- [x] **`src/core/db/migrations.{h,cpp}`**
   - [ ] The five `.sql` files copied **byte-for-byte** into
         `src/core/db/migrations/` and compiled in through the resource system
   - [ ] Runner keyed on `PRAGMA user_version`, one transaction per migration,
         refusing to run against a database from a newer schema
   - [ ] **Append-only.** Never edit a shipped migration
-- [x] **`src/core/models/`** ← `models/book.rs`
+- [x] **`src/core/models/`**
   - [ ] `Book`, `NewBook`; `BookStatus`, `TextQuality`, `BookFormat` as
         `Q_ENUM`s with the same lowercase string encodings, `fromString`
         returning an error rather than defaulting on an unknown value
   - [ ] `Book::readablePath()` prefers `readingPath`; `authorLine()` joins with
         `", "` and falls back to `"Unknown author"`
   - [ ] `authors` serialises to and from a **JSON array as text**
-- [x] **`src/core/repo/bookrepository.{h,cpp}`** ← `repo/book_repo.rs` (889 lines,
-      the biggest single file in the core)
+- [x] **`src/core/repo/bookrepository.{h,cpp}`** — the biggest file in the core
   - [ ] `list(filter, sort)`, `find`, `findByHash`, `count`, `counts`, `listIds`
   - [ ] `insert` idempotent on `file_hash`, returning the existing id
   - [ ] `saveProgress` — clamps the fraction, moves `unread → reading` on first
@@ -121,13 +117,13 @@ and it is the cheapest place to be wrong.
   - [ ] `toggleFavorite`, `toggleQueued`, `isQueued`, `reorderQueue`
         (renumbering gaplessly from 1), `delete`
   - [ ] The Queue filter overrides the requested sort with `position`
-- [x] **`src/core/repo/noterepository.{h,cpp}`** ← `repo/notes.rs`
+- [x] **`src/core/repo/noterepository.{h,cpp}`**
   - [ ] `upsert` matching on `(book_id, cfi)`, `COALESCE`-preserving fields left
         unset, rejecting an annotation with neither quote nor body
   - [ ] `forBook` ordered by `page_fraction` then `created_at`; `all` newest first
-- [x] **`src/core/repo/taxonomy.{h,cpp}`** ← `repo/taxonomy.rs` — `slugify`,
+- [x] **`src/core/repo/taxonomy.{h,cpp}`** — `slugify`,
       `ensure` (find-or-create by slug), `attach`, `listWithCounts`
-- [x] **`src/core/repo/settingsrepository.{h,cpp}`** ← `repo/settings.rs`
+- [x] **`src/core/repo/settingsrepository.{h,cpp}`**
 - [x] **Tests** (30 in RepoTest, 20 in CoreTest): schema version after migrate and after migrating twice;
       downgrade refused; foreign keys enforced; idempotent insert; authors round
       trip; case-insensitive title sort; first progress moves to reading;
@@ -141,11 +137,11 @@ and it is the cheapest place to be wrong.
       duplicates; re-highlight preserves an existing body; notes in reading
       order; empty annotation rejected; slugs normalise; ensure idempotent
       across spellings; empty categories unlisted; counts reflect assignments
-- [x] **A database written by the Rust build opens unchanged** (§4). The real
-      47 MB library — 51 books, 4,755 embedded chunks — is copied to a temp dir
-      and read back through `BookRepository`, so enum decoding, the JSON
-      authors column and the progress join are all exercised against data the
-      port did not write. Skips rather than fails where there is no library
+- [x] **The library already on disk opens unchanged** (§4). The real 47 MB
+      library — 51 books, 4,755 embedded chunks — is copied to a temp dir and
+      read back through `BookRepository`, so enum decoding, the JSON authors
+      column and the progress join are all exercised against data this build
+      did not write. Skips rather than fails where there is no library
 
 ---
 
@@ -160,7 +156,7 @@ and it is the cheapest place to be wrong.
       rules: under 3 characters; starting `pii:`, `the project gutenberg ebook #`,
       `microsoft word`, `untitled`; ending `.doc`/`.pdf`/`.indd`/`.qxd`; or fewer
       than half the characters alphabetic. Falls back to a tidied filename
-- [x] **`import/epub.{h,cpp}`** ← `import/epub.rs` (535 lines)
+- [x] **`import/epub.{h,cpp}`**
   - [x] `QZipReader`; `container.xml` → OPF rootfile → manifest, spine, metadata
   - [x] **`QXmlStreamReader` matched on `namespaceUri()` + local name**, `href`
         and `media-type` in the empty namespace, and a
@@ -176,7 +172,7 @@ and it is the cheapest place to be wrong.
         tags, unescape text
   - [x] **Caps re-checked against the actual read**, never the zip header: 12 MiB
         a cover, 32 MiB an entry, 256 MiB a book
-- [x] **`import/mobi.{h,cpp}`** ← `import/mobi.rs` — PalmDB record 0, `BOOKMOBI`
+- [x] **`import/mobi.{h,cpp}`** — PalmDB record 0, `BOOKMOBI`
       magic at 60, `MOBI` magic at record0+16, encoding 65001 → UTF-8 else
       byte-as-codepoint, EXTH block when `flags & 0x40`, record types
       100/101/103/104/105/106/503/524, a record length under 8 breaking the loop.
@@ -191,10 +187,10 @@ and it is the cheapest place to be wrong.
 - [x] **`import/covers.{h,cpp}`** — content-addressed at
       `{data}/covers/{hash}.{ext}`, extension sanitised to five lowercase ASCII
       alphanumerics defaulting to `jpg`
-  - [x] **New in the port:** thumbnail with `QImageReader`, `setAutoTransform(true)`,
+  - [x] Thumbnail with `QImageReader`, `setAutoTransform(true)`,
         and `setScaledSize` computed from `reader.size()` to fit 320×480,
         written as JPEG quality 85 (§5.2)
-- [x] **`import/classify.{h,cpp}`** ← `import/classify.rs` — the 26-shelf keyword
+- [x] **`import/classify.{h,cpp}`** — the 26-shelf keyword
       table **in its exact order** (specific before general: Science Fiction
       before Fiction, Mathematics before Science), whole-word matching, BISAC and
       Library-of-Congress head extraction, `looksLikeAName` (2–3 capitalised
@@ -226,7 +222,7 @@ and it is the cheapest place to be wrong.
 
 ## Phase P3 — Speech and AI core — **removed on this branch**
 
-Ported in full, then deleted here along with the features it served (SPEC §5.4
+Built in full, then deleted here along with the features it served (SPEC §5.4
 to §5.8). It stands on `main-with-ai-features`: the Kokoro client and sentence
 chunker, Ollama and Anthropic, the work policy and its AC-power detection,
 vectors and cosine, the prompts, the indexer and the assistant. 53 of the
@@ -313,9 +309,9 @@ The first phase with a window in it.
 ## Phase P6 — The reader (§5.3, §7.3)
 
 **Build the bridge first, not last.** This is the riskiest integration in the
-project, and the Rust build's Phase 0 finding is why the handshake rule exists.
+project, and an early spike is why the handshake rule exists.
 
-- [x] Vendor foliate-js into `assets/reader/` (gitignored; `bin/install` fetches it)
+- [x] Vendor foliate-js into `assets/reader/` (`bin/vendor-foliate-js`)
 - [x] Copy `reader.html`, `js-polyfills.js`, `pdf-worker-shim.mjs` across
       **unchanged**
 - [x] **`bridge/readerbridge.{h,cpp}`** — `lastCfi`, `lastFraction`, `chapter`,
@@ -333,8 +329,8 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [ ] Every bridge call has a timeout and a defined failure mode; both sides log
 - [ ] Progress saved on relocate, debounced; highlights and notes saved and
       painted; annotations repainted on `create-overlay`
-- [ ] **Verified on an EPUB *and* a PDF.** Every reader check in the Rust build
-      used the same EPUB until a PDF-only crash surfaced months later
+- [ ] **Verified on an EPUB *and* a PDF.** Every reader check once used the
+      same EPUB, until a PDF-only crash surfaced months later
 - [ ] WebEngine does not run under `QT_QPA_PLATFORM=offscreen`; this is verified
       by hand on the real Wayland session, and `tst_omabook` must not link it
 
@@ -345,30 +341,27 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 `TtsController` and `AiController`, their worker threads, and `AiPanel.qml`,
 `AskView.qml` and `AnswerBox.qml`. See `main-with-ai-features`.
 
-## Phase P8 — Parity check
+## Phase P8 — End-to-end check
 
-- [ ] The `--probe-*` / `--verify-reader` / `--headless-check` harness ported
-      with its exact flag vocabulary, `PROBE-*:` / `VERIFY *:` log prefixes and
+- [ ] The `--probe-*` / `--verify-reader` / `--headless-check` harness, with
+      its exact flag vocabulary, `PROBE-*:` / `VERIFY *:` log prefixes and
       exit codes (§5.12). External tooling greps for those strings
 - [x] `--headless-check`, `--verify-reader` on an EPUB **and** a PDF,
       `--probe-queue` and `--probe-highlight` all pass, and `--probe-queue`
-      reorders identically to the Rust build run side by side
+      reorders the queue as intended
 - [x] `--probe-import` — three books into a scratch library: categories from
       their folders, Devanagari titles intact, `text_quality` assessed (the PDF
       scored `poor`), subject tags extracted, covers thumbnailed. **31
       event-loop ticks during the import**, so it genuinely runs off the UI
-      thread; the Rust build ticks 7 on the same corpus
-- [x] Covers are thumbnailed as intended: 320x410, 320x414, 320x425 against the
-      Rust build's 398x510, 680x880 and 564x750 originals — aspect preserved,
+      thread
+- [x] Covers are thumbnailed as intended: 320x410, 320x414, 320x425 from
+      398x510, 680x880 and 564x750 originals — aspect preserved,
       all re-encoded to JPEG, 392 KB down to 110 KB
 - [ ] **Run the probes against a scratch `HOME`.** They write to the real
       library — the queue probe reorders your actual reading queue — and a
       probe combined with `--open` measures a screen the reader is covering
-- [ ] `bin/test` green; the ported tests cover what the Rust build's 75 covered
-- [ ] Open the real database written by the Rust build and read from it
-- [~] Side-by-side against `~/Projects/omabook-rust`: the queue drag, the reader on
-      EPUB and PDF, highlights and library Q&A all match. Still to compare:
-      search, the three ask scopes, read page and auto read, theme switch
+- [ ] `bin/test` green, with each subsystem's tests covering its behaviour
+- [ ] Open the real library database from the running app and read from it
 - [ ] `qmllint` against the QML, and a run with no engine warnings
 
 ---
@@ -378,10 +371,9 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 - [ ] `omabook.desktop` with `StartupWMClass=omabook`, `Exec=omabook %f`, and the
       EPUB/MOBI/PDF mime list
 - [ ] **Handle a bare file path in `main()`.** The `.desktop` passes one and
-      nothing reads it, in this build or the Rust one, so double-clicking a book
-      opens the library rather than the book. Import it if it is unknown, then
-      open it. The probe flags need no work — `Qt.application.arguments` reads
-      the same list from QML in a C++ application as it did in the Rust one
+      nothing reads it, so double-clicking a book opens the library rather than
+      the book. Import it if it is unknown, then open it. The probe flags need
+      no work: `Qt.application.arguments` already reads them from QML
 - [ ] `pkgbuild/PKGBUILD` building through `bin/build`, with
       **`qt6-multimedia-ffmpeg` and `qt6-imageformats` in `depends`** — both are
       silent-failure dependencies (§3.4)
@@ -395,9 +387,9 @@ project, and the Rust build's Phase 0 finding is why the handshake rule exists.
 
 ---
 
-## After parity — what the Rust build had not finished either
+## Beyond the current scope
 
-Carried across unchanged, in rough order of value.
+In rough order of value.
 
 - [ ] **Honour `omarchy display text size` / `text-scaling-factor` live** (§3.5).
       omawrite's `systemtheme.cpp` does exactly this and ports nearly verbatim —
@@ -425,4 +417,4 @@ Carried across unchanged, in rough order of value.
 - [ ] OPDS; Kobo / KOReader sync; audiobooks; OCR
 - [ ] A `QWebEngineUrlSchemeHandler` serving book bytes straight out of the zip,
       which would let the reader assets return to `qrc:` — cleaner than the
-      current disk layout, and deliberately not attempted during the port
+      current disk layout, and deliberately not attempted yet
