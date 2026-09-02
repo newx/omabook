@@ -25,11 +25,7 @@ depends=(
   'xdg-desktop-portal'
 )
 
-makedepends=('qt6-base' 'git')
-
-# Nothing. Calibre was here to convert MOBI and AZW3 into EPUB so the indexer
-# could read their text; with no indexer, and with foliate-js reading MOBI
-# directly, there is nothing left for it to do.
+makedepends=('qt6-base')
 
 # No source array: this builds the checkout it sits in, the way omawrite's
 # PKGBUILD does. Fetching a release tarball would be right for the AUR and
@@ -57,18 +53,21 @@ package() {
   /usr/bin/install -Dm644 pkgbuild/omabook.svg \
     "$pkgdir/usr/share/icons/hicolor/scalable/apps/omabook.svg"
   /usr/bin/install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  # The reader engine is vendored into this package, so its licence ships too.
+  /usr/bin/install -Dm644 assets/reader/foliate-js/LICENSE \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE.foliate-js"
 
   # The reader ships as data rather than embedded, so it can load book files
   # from disk: a qrc: page cannot.
   /usr/bin/install -dm755 "$pkgdir/usr/share/omabook"
   cp -r assets/reader "$pkgdir/usr/share/omabook/reader"
 
-  # foliate-js arrives as a git clone rather than a vendored tree, so its
-  # history comes with it -- 3.6 MB, half the package, and of no use to anyone
-  # installing a book reader.
-  rm -rf "$pkgdir/usr/share/omabook/reader/foliate-js/.git" \
-         "$pkgdir/usr/share/omabook/reader/foliate-js/.github" \
-         "$pkgdir/usr/share/omabook/reader/foliate-js/node_modules"
+  # foliate-js is vendored verbatim, so upstream's repository metadata and CI
+  # configuration come with it. None of that is of use to anyone installing a
+  # book reader. foliate-js.version stays: it is what says which engine this is.
+  local _fj="$pkgdir/usr/share/omabook/reader/foliate-js"
+  rm -rf "$_fj/.github" "$_fj/.gitignore" "$_fj/.gitattributes" \
+         "$_fj/tests" "$_fj/node_modules"
 
   find "$pkgdir/usr/share/omabook" -type d -exec chmod 755 {} +
   find "$pkgdir/usr/share/omabook" -type f -exec chmod 644 {} +

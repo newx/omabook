@@ -9,7 +9,6 @@ Makefile
 *.db
 *.db-wal
 *.db-shm
-/assets/reader/foliate-js
 
 # makepkg's working directories and output
 /pkgbuild/pkg

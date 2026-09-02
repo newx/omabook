@@ -20,13 +20,13 @@ APP_DIR="$DATA_HOME/applications"
 ICON_DIR="$DATA_HOME/icons/hicolor/scalable/apps"
 READER_DIR="$DATA_HOME/omabook/reader"
 
-# The reader engine is a separate project with its own history, so it is not
-# vendored. Without it omabook builds and the library works, but opening a book
-# renders nothing at all.
+# The reader engine is vendored in assets/reader/foliate-js. Without it omabook
+# builds and the library works, but opening a book renders nothing at all, so
+# fail here rather than at the first book someone opens.
 if [ ! -f "$ROOT/assets/reader/foliate-js/view.js" ]; then
-  echo "Fetching the reader engine (foliate-js)..."
-  git clone --depth 1 https://github.com/johnfactotum/foliate-js.git \
-    "$ROOT/assets/reader/foliate-js"
+  echo "assets/reader/foliate-js is missing or incomplete." >&2
+  echo "Restore it with: bin/vendor-foliate-js" >&2
+  exit 1
 fi
 
 "$ROOT/bin/build"
@@ -40,8 +40,7 @@ install -Dm644 "$ROOT/pkgbuild/omabook.svg" "$ICON_DIR/omabook.svg"
 # deleted upstream would otherwise linger for ever.
 rm -rf "$READER_DIR"
 cp -r "$ROOT/assets/reader" "$READER_DIR"
-rm -rf "$READER_DIR/foliate-js/.git" "$READER_DIR/foliate-js/.github" \
-       "$READER_DIR/foliate-js/node_modules"
+rm -rf "$READER_DIR/foliate-js/.github" "$READER_DIR/foliate-js/node_modules"
 
 # The packaged .desktop says `Exec=omabook`, which needs ~/.local/bin on PATH.
 # Here we know the absolute path, so use it and remove the doubt.

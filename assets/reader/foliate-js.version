@@ -1,0 +1,14 @@
+# The vendored reader engine.
+#
+# assets/reader/foliate-js is a verbatim copy of upstream at the commit below,
+# with the clone's .git removed. It carries no omabook changes and must not
+# start carrying any: everything omabook adds on top of foliate lives outside
+# the tree -- the fixed-layout overlay in reader.html, js-polyfills.js,
+# pdf-worker-shim.mjs -- so that an update stays a replacement rather than a
+# merge. `diff -r` against the upstream archive should always come back empty.
+#
+# Update with: bin/vendor-foliate-js [ref]
+
+url      = https://github.com/johnfactotum/foliate-js
+commit   = 78914aef4466eb960965702401634c2cb348e9b1
+vendored = 2026-09-02

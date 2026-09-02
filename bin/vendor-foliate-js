@@ -1,0 +1,62 @@
+#!/usr/bin/env sh
+set -eu
+
+# Replace the vendored reader engine with a given upstream commit.
+#
+#   bin/vendor-foliate-js            # whatever main points at today
+#   bin/vendor-foliate-js <ref|sha>  # a tag, a branch, or a full commit
+#
+# foliate-js is vendored rather than fetched, so that a release tarball is a
+# complete, buildable reader. That only works if updating it stays a single
+# mechanical step -- hence this script, and hence the rule that nothing in
+# assets/reader/foliate-js is ever edited in place. Review the diff it leaves
+# behind before committing: it is upstream's diff, and nothing else.
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+TREE="$ROOT/assets/reader/foliate-js"
+URL="https://github.com/johnfactotum/foliate-js"
+REF="${1:-main}"
+
+for tool in git curl tar; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "$tool is required." >&2
+    exit 1
+  }
+done
+
+# A branch or tag has to be resolved to the commit it points at today, or the
+# version file would record a moving target. A full SHA resolves to nothing,
+# which is the signal to use it as given.
+COMMIT="$(git ls-remote "$URL.git" "$REF" 2>/dev/null | cut -f1 | head -n1)"
+[ -n "$COMMIT" ] || COMMIT="$REF"
+
+case "$COMMIT" in
+  [0-9a-f]*) [ ${#COMMIT} -eq 40 ] || { echo "Not a commit: $REF" >&2; exit 1; } ;;
+  *) echo "Not a commit: $REF" >&2; exit 1 ;;
+esac
+
+echo "Vendoring foliate-js $COMMIT"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+curl -fsSL "$URL/archive/$COMMIT.tar.gz" -o "$TMP/foliate-js.tar.gz"
+mkdir -p "$TMP/tree"
+tar -xzf "$TMP/foliate-js.tar.gz" -C "$TMP/tree" --strip-components=1
+
+# view.js is what reader.html imports; if it is missing the archive was not what
+# we asked for, and replacing the tree would leave a reader that renders nothing.
+[ -f "$TMP/tree/view.js" ] || { echo "No view.js in the archive; aborting." >&2; exit 1; }
+
+# Replace wholesale rather than merge, so a file deleted upstream goes away here
+# too.
+rm -rf "$TREE"
+mv "$TMP/tree" "$TREE"
+
+sed -e "s|^commit   = .*|commit   = $COMMIT|" \
+    -e "s|^vendored = .*|vendored = $(date +%Y-%m-%d)|" \
+    "$ROOT/assets/reader/foliate-js.version" > "$TMP/version"
+mv "$TMP/version" "$ROOT/assets/reader/foliate-js.version"
+
+echo "Vendored into $TREE"
+echo "Review with: git -C \"$ROOT\" diff --stat assets/reader/foliate-js"

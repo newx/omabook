@@ -13,8 +13,9 @@ database and the covers are local, and it behaves the same with the cable out.
 
 ## Install
 
-Not yet in the Omarchy Package Repository, so it is built from source. Both
-paths fetch the reader engine and build it for you.
+Not yet in the Omarchy Package Repository, so it is built from source. A clone
+is everything you need: the reader engine is vendored, so both paths just
+build.
 
 **As a system package** — the Omarchy way, and what you want on Arch:
 
@@ -153,12 +154,18 @@ Qt 6 (`qt6-base`, `qt6-declarative`, `qt6-webengine`, `qt6-webchannel`,
 
 ## Building
 
-Qt 6 is the only build dependency, plus a clone of foliate-js in
-`assets/reader/` — `bin/install` fetches it, or by hand:
+Qt 6 is the only build dependency. The reader engine, [foliate-js][], is
+vendored verbatim in `assets/reader/foliate-js` at the commit recorded in
+`assets/reader/foliate-js.version`, so there is nothing to fetch. It is never
+patched in place — what omabook adds sits beside it in `reader.html`,
+`js-polyfills.js` and `pdf-worker-shim.mjs` — which keeps an update to one
+command:
 
 ```bash
-git clone https://github.com/johnfactotum/foliate-js.git assets/reader/foliate-js
+./bin/vendor-foliate-js   # replaces the tree; the diff is upstream's
 ```
+
+[foliate-js]: https://github.com/johnfactotum/foliate-js
 
 ```bash
 ./bin/build          # release build, into build/

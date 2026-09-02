@@ -22,7 +22,7 @@ named and justified where it appears rather than left to be discovered.
 
 ## Setup
 
-Two things are needed before a clone will run.
+One thing is needed before a clone will run, and one thing used to be.
 
 **1. Qt 6.** `qt6-base`, `qt6-declarative`, `qt6-webengine`, `qt6-webchannel`,
 `qt6-imageformats`, `qt6-svg`, plus `poppler` for PDF covers and text. Arch
@@ -32,12 +32,25 @@ ships qmake as `qmake6`; `bin/build` resolves either name.
 — which some EPUBs use — decode to nothing and the book gets no cover, with no
 error anywhere.
 
-**2. foliate-js.** The reader engine is not vendored and is gitignored. Without
-it the app builds and the library works, but opening a book renders nothing:
+**2. Nothing else.** The reader engine, foliate-js, is vendored in
+`assets/reader/foliate-js`, so a clone is complete and a release tarball is a
+buildable reader. It is a verbatim copy of one upstream commit, recorded in
+`assets/reader/foliate-js.version`, and it is never edited in place: everything
+omabook adds on top of foliate lives outside the tree — the fixed-layout
+overlay in `reader.html`, `js-polyfills.js`, `pdf-worker-shim.mjs` — so that an
+update stays a replacement rather than a merge. Update it with one command, and
+review what it leaves behind as upstream's diff and nothing else:
 
 ```bash
-git clone https://github.com/johnfactotum/foliate-js.git assets/reader/foliate-js
+./bin/vendor-foliate-js          # whatever main points at today
+./bin/vendor-foliate-js <commit> # or a specific one
 ```
+
+Until 0.1.1 it was cloned per checkout instead, and gitignored. That was fine
+for a working copy and wrong for a package: being gitignored, it was absent
+from the GitHub release tarball, so a package built from that tarball would
+install, launch, list a library, and render nothing at all when a book was
+opened — with no error anywhere.
 
 ## Build, test, run
 
