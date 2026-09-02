@@ -22,7 +22,7 @@ CONFIG += c++17
 # a C++ one under the same name, installed side by side, and telling them apart
 # by looking at a window is impossible. Empty when built from a tarball with no
 # git, which is fine.
-OMABOOK_VERSION = 0.1.0
+OMABOOK_VERSION = 0.1.1
 OMABOOK_REVISION = $$system(git -C $$PWD describe --always --dirty --tags 2>/dev/null)
 OMABOOK_BRANCH = $$system(git -C $$PWD rev-parse --abbrev-ref HEAD 2>/dev/null)
 isEmpty(OMABOOK_REVISION): OMABOOK_REVISION = unknown

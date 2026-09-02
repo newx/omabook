@@ -1,7 +1,7 @@
 # Maintainer: Newton Ramos Garcia <n@newx.sh>
 
 pkgname=omabook
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc='Book library and reader built with Qt Quick'
 arch=('x86_64')
