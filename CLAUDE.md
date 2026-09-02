@@ -5,13 +5,10 @@ Orientation for coding agents working in this repository. Humans want the
 obvious from the code.
 
 **What this is.** omabook is a book library and reader for Omarchy — EPUB, PDF
-and MOBI, with reading aloud and local AI. It was written in Rust with
-[cxx-qt](https://github.com/KDAB/cxx-qt) and is being reimplemented here in
-plain C++17 and Qt 6, so that it is built the same way as
-[omawrite](https://github.com/omacom-io/omawrite), the Omarchy Markdown editor.
-The Rust original lives at `~/Projects/omabook-rust` and is the reference for
-behaviour; [SPEC.md](SPEC.md) is the reference for intent and
-[TODO.md](TODO.md) tracks the port.
+and MOBI, with reading aloud and local AI. It is plain C++17 and Qt 6, built
+the same way as [omawrite](https://github.com/omacom-io/omawrite), the Omarchy
+Markdown editor. [SPEC.md](SPEC.md) is the reference for intent and
+[TODO.md](TODO.md) tracks what is left.
 
 **omawrite is the style authority.** When this document and omawrite disagree,
 omawrite wins and this document is wrong. There are exactly three deliberate
@@ -102,12 +99,10 @@ than a code review comment:
 c.cpp:1:10: fatal error: QQmlEngine: No such file or directory
 ```
 
-That is the direct translation of the Rust version's crate split, where
-`omabook-core/Cargo.toml` simply did not list `cxx-qt`. Two caveats worth
-knowing: the app build compiles the same files *with* those paths present, so
-only `bin/test` catches a violation — run it; and the fully-qualified form
-`#include <QtQml/QQmlEngine>` compiles anyway because `/usr/include/qt6` is
-always on the path, so `bin/test` also greps for it.
+Two caveats worth knowing: the app build compiles the same files *with* those
+paths present, so only `bin/test` catches a violation — run it; and the
+fully-qualified form `#include <QtQml/QQmlEngine>` compiles anyway because
+`/usr/include/qt6` is always on the path, so `bin/test` also greps for it.
 
 **Where the boundary sits, exactly.** `src/core` may use QtCore, QtSql,
 QtNetwork, QtConcurrent, and QtGui *for images only* — `QImage`, `QImageReader`,
@@ -224,7 +219,7 @@ watched inode. Re-arm the watcher, but do not report our own save as an outside
 edit."* — is the target register. Several comments reference `SPEC §x`; keep
 that.
 
-**No third-party C++ libraries.** omawrite has none, and the port has none.
+**No third-party C++ libraries.** omawrite has none, and neither does this.
 `poppler` and `calibre` are used as external *processes*, not linked libraries.
 If you find yourself wanting a library, say so in TODO.md and argue for it; do
 not add it quietly. The one thing that looks like an exception is
@@ -234,9 +229,8 @@ not add it quietly. The one thing that looks like an exception is
 
 ## Threading
 
-The Rust version owned a tokio runtime and marshalled results back to the Qt
-thread. In C++ the equivalent is Qt's own, and there are three patterns used in
-three distinct places. Do not invent a fourth.
+Everything asynchronous goes through Qt's own primitives, and there are three
+patterns used in three distinct places. Do not invent a fourth.
 
 **The universal rule: a cross-thread signal-to-slot connection is automatically
 queued, and that is the only channel between threads.** No shared mutable state,
@@ -297,7 +291,7 @@ a member.
 `QSqlDatabase` with the `QSQLITE` driver — no direct `sqlite3` dependency. This
 was verified rather than assumed (`docs/spikes.md`): on Arch the driver links the
 system SQLite, 3.53.4, and supports WAL, FTS5 with `remove_diacritics 2`, and
-`VACUUM INTO`, which is everything the Rust build used `rusqlite` for.
+`VACUUM INTO`, which is everything this app asks of SQLite.
 
 **Opening a connection.** `setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"))`
 *before* `open()`, then `PRAGMA journal_mode=WAL` and `PRAGMA foreign_keys=ON`
@@ -325,8 +319,8 @@ expression, where the terms are quoted and escaped by hand; that function is
 `fromRawData` over a vector that will go out of scope, and `memcpy` back out
 rather than aliasing, because the blob's alignment is not guaranteed. Store each
 vector's norm in its own column at embed time so query time is a dot product.
-The Rust version chose brute-force cosine over an ANN index because the corpus
-is a few hundred thousand chunks at most (SPEC §4.1); keep that. If it ever
+Brute-force cosine beats an ANN index here because the corpus is a few hundred
+thousand chunks at most (SPEC §4.1); keep it that way. If it ever
 feels slow, `QtConcurrent::blockingMapped` over shards is the first move, not
 intrinsics.
 
@@ -334,8 +328,8 @@ intrinsics.
 
 ## Error handling
 
-Rust's `Result<T, E>` has no cheap C++ equivalent, `std::expected` is C++23 and
-we are on C++17, and Qt's event loop is explicitly not exception-safe — a throw
+`std::expected` is C++23 and we are on C++17, and Qt's event loop is explicitly
+not exception-safe — a throw
 crossing `exec()` or a signal-slot boundary is undefined behaviour. So:
 
 **No exceptions.** Not thrown, not caught, no `try` blocks.
@@ -365,8 +359,8 @@ the phrasing, `setStatus(...)` shows it, and the function returns early. The
 user gets a sentence, the UI stays alive, nothing unwinds.
 
 **Every failure is visible somewhere.** A silent `return` with no status set is
-a bug — it is exactly how the Rust version's WebChannel handshake fault hid for
-a day (`docs/spikes.md`). If there is genuinely nothing to show the user,
+a bug — it is exactly how the WebChannel handshake fault hid for a day
+(`docs/spikes.md`). If there is genuinely nothing to show the user,
 `qWarning()` it.
 
 ---
@@ -376,8 +370,8 @@ a day (`docs/spikes.md`). If there is genuinely nothing to show the user,
 **Every `.qml` file must be listed in `src/app/app.qrc`.** An unregistered file
 is not a compile error and not a startup error: the type silently does not
 exist, and you find out when that screen is first instantiated and renders an
-empty pane. This is the single most common way to lose an hour here, and it is
-the same trap the Rust build had with `build.rs`. `tst_omabook` walks `:/` with
+empty pane. This is the single most common way to lose an hour here.
+`tst_omabook` walks `:/` with
 `QDirIterator` and `QQmlComponent::create()`s every `.qml`, which catches both a
 missing entry and about half of all binding typos, offscreen.
 
@@ -414,13 +408,11 @@ row-count change corrupts the view. A full re-query is
 **A multi-word property exposed to QML is `snake_case`; an invokable is
 `camelCase`.** `theme_name`, `last_cfi`, `pdf_page`, `status_line`,
 `categories_json`, `available_providers` — but `setFilterAndReload`,
-`readerUrlFor`, `startReading`. This is not a style choice: cxx-qt never
-camelCased a `#[qproperty]` name while every invokable carried an explicit
-`#[cxx_name]`, so the ported QML reads exactly these tokens and the QML is the
-contract. `Q_PROPERTY` lets the token and the accessors differ, so the C++ side
-stays idiomatic: `Q_PROPERTY(QString theme_name READ themeName NOTIFY
-themeNameChanged)`. Get it wrong and the binding reads `undefined` with no
-warning at any stage.
+`readerUrlFor`, `startReading`. This is not a style choice: the QML already
+reads exactly these tokens, and the QML is the contract. `Q_PROPERTY` lets the
+token and the accessors differ, so the C++ side stays idiomatic:
+`Q_PROPERTY(QString theme_name READ themeName NOTIFY themeNameChanged)`. Get it
+wrong and the binding reads `undefined` with no warning at any stage.
 
 **Do not return `QObject *` from a `Q_INVOKABLE`** unless you have called
 `QQmlEngine::setObjectOwnership(obj, QQmlEngine::CppOwnership)` — otherwise the
@@ -476,7 +468,7 @@ resolve at runtime through `src/app/assets.cpp`, which also finds them in the
 source tree during development. (A `QWebEngineUrlSchemeHandler` serving book
 bytes straight out of the zip would be cleaner and would let the assets return
 to `qrc:`; it is recorded in TODO.md as a refinement, deliberately not attempted
-during the port.)
+yet.)
 
 **Reader chrome is QML around the web view, never HTML inside it**, so it looks
 and behaves native.
@@ -499,9 +491,8 @@ the pipe fills and the child stalls. Give every process a timeout.
 omawrite's does. Tests are `private slots` on one `QObject`, using `QCOMPARE`
 and `QVERIFY`, and run under `QT_QPA_PLATFORM=offscreen`.
 
-**Test the static helpers.** That is what they are for. The Rust version had 75
-tests over the core; the port should reach the same coverage of the same
-behaviour, and TODO.md tracks them per subsystem.
+**Test the static helpers.** That is what they are for. TODO.md tracks the
+coverage the core is meant to reach, per subsystem.
 
 **Temporary state, never the real database.** `QTemporaryDir`, and
 `QStandardPaths::setTestModeEnabled(true)` in `initTestCase` so nothing writes to
@@ -521,8 +512,8 @@ probe measures a covered screen.
 **WebEngine cannot be tested here.** It does not run under the offscreen
 platform — the view never loads and the run is silent rather than failing.
 Reader verification is manual, on the real Wayland session, and must cover an
-EPUB *and* a PDF: every reader check in the Rust version used the same EPUB
-until a PDF-only crash surfaced months later.
+EPUB *and* a PDF: every reader check once used the same EPUB, until a PDF-only
+crash surfaced months later.
 
 ---
 
@@ -555,7 +546,7 @@ The short list of things that will cost you an hour each.
 - **Do not call into the page before `readerReady()`.** Silent no-op otherwise.
 - **`QProcess::errorOccurred`, not just `finished`**, or a missing `ebook-convert`
   hangs the import.
-- **`QXmlStreamReader` is strict where quick-xml was not.** Match on
+- **`QXmlStreamReader` is stricter than it looks.** Match on
   `namespaceUri()` plus local name, never `qualifiedName()`, because real OPFs
   come as `<package>`, `<opf:package>` and worse; look up `href` and `media-type`
   in the *empty* namespace; and install a `QXmlStreamEntityResolver` returning a
@@ -589,5 +580,5 @@ The short list of things that will cost you an hour each.
 ## Commits
 
 **One change each**, with a message explaining the problem the change solves
-rather than listing the diff. During the port, a commit is usually one subsystem
-moved across with its tests passing.
+rather than listing the diff. A commit is usually one subsystem, with its tests
+passing.
